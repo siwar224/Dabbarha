@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
+import type { ColorValue } from "react-native";
 
 import { colors } from "@/theme/colors";
 
@@ -11,10 +12,10 @@ function tabIcon(name: TabIconName) {
     color,
     size
   }: {
-    color: string;
+    color: ColorValue | null;
     size: number;
   }) {
-    return <MaterialCommunityIcons name={name} color={color} size={size} />;
+    return <MaterialCommunityIcons name={name} color={String(color ?? colors.mutedText)} size={size} />;
   };
 }
 
