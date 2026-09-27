@@ -1,7 +1,7 @@
 export type ExpenseCategory =
   | "transport"
   | "food"
-  | "shopping"
+  | "home"
   | "care"
   | "coffee"
   | "other";
