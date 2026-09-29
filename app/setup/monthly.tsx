@@ -1,29 +1,45 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { SetupFlowScreen } from "@/components/SetupFlowScreen";
+import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 
 export default function MonthlySetupScreen() {
+  const { income, setIncome } = useSetup();
+  const [salary, setSalary] = useState(String(income));
+
+  useEffect(() => {
+    setSalary(String(income));
+  }, [income]);
+
+  async function handleNext() {
+    await setIncome(Number(salary) || 0);
+    router.push("/setup/plan");
+  }
+
   return (
     <SetupFlowScreen
       progress={1}
       title="إعداد الشهرية"
       subtitle="كم هي قيمة دخلك الشهري؟ (تقدر تغيّرها لاحقًا)"
       buttonLabel="التالي"
-      onNext={() => router.push("/setup/plan")}
+      onNext={handleNext}
     >
       <View style={styles.salaryCard}>
         <Text style={styles.fieldLabel}>الشهرية (د)</Text>
         <View style={styles.inputRow}>
           <Text style={styles.currency}>د</Text>
           <TextInput
-            value="800"
-            editable={false}
+            value={salary}
+            onChangeText={setSalary}
             style={styles.input}
             textAlign="center"
             keyboardType="numeric"
+            placeholder="0"
+            placeholderTextColor={colors.mutedText}
           />
           <View style={styles.walletIcon}>
             <MaterialCommunityIcons name="wallet-outline" color={colors.primary} size={27} />
