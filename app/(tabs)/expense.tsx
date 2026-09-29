@@ -1,26 +1,20 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories, type CategoryOption } from "@/constants/categories";
 import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import type { ExpenseCategory } from "@/types/finance";
-import { formatMoney } from "@/utils/formatMoney";
-
-const logoHeader = require("../../assets/images/logo-header.png");
 
 export default function ExpenseScreen() {
-  const { allocations, addTransaction } = useSetup();
-  const [amount, setAmount] = useState("");
+  const { addTransaction } = useSetup();
+  const [amount, setAmount] = useState("25");
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>("transport");
   const [isUnplanned, setIsUnplanned] = useState(true);
   const [note, setNote] = useState("");
-
-  const savingsTarget = allocations.find((item) => item.id === "saving")?.amount ?? 0;
-  const nextMonthRequired = savingsTarget + (Number(amount) || 0);
 
   async function handleSubmit() {
     const parsedAmount = Number(amount);
@@ -45,23 +39,16 @@ export default function ExpenseScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Pressable style={styles.iconButton} accessibilityLabel="رجوع">
-            <MaterialCommunityIcons name="chevron-left" color={colors.primary} size={32} />
+          <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityLabel="رجوع">
+            <MaterialCommunityIcons name="chevron-left" color={colors.primary} size={30} />
           </Pressable>
-
-          <Image source={logoHeader} style={styles.logoHeader} resizeMode="contain" />
-
-          <Pressable style={styles.iconButton} accessibilityLabel="الإعدادات">
-            <MaterialCommunityIcons name="cog-outline" color={colors.primary} size={24} />
-          </Pressable>
+          <Text style={styles.screenTitle}>زيد مصروف</Text>
+          <View style={styles.headerSpacer} />
         </View>
 
-        <Text style={styles.screenTitle}>زيد مصروف</Text>
-
-        <View style={styles.formPanel}>
-          <Text style={styles.fieldLabel}>المبلغ</Text>
+        <View style={styles.amountSection}>
+          <Text style={styles.fieldLabel}>المبلغ (د)</Text>
           <View style={styles.amountBox}>
-            <Text style={styles.currency}>د</Text>
             <TextInput
               value={amount}
               onChangeText={setAmount}
@@ -72,28 +59,32 @@ export default function ExpenseScreen() {
               placeholderTextColor={colors.mutedText}
             />
           </View>
+        </View>
 
-          <Text style={[styles.fieldLabel, styles.categoryLabel]}>الصنف</Text>
-          <View style={styles.categoryGrid}>
-            {expenseCategories.map((category) => (
-              <CategoryCard
-                key={category.id}
-                category={category}
-                isSelected={selectedCategory === category.id}
-                onPress={() => setSelectedCategory(category.id)}
-              />
-            ))}
-          </View>
+        <View style={styles.categoryGrid}>
+          {expenseCategories.map((category) => (
+            <CategoryCard
+              key={category.id}
+              category={category}
+              isSelected={selectedCategory === category.id}
+              onPress={() => setSelectedCategory(category.id)}
+            />
+          ))}
         </View>
 
         <Pressable style={styles.dateRow}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={24} />
+          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={23} />
           <Text style={styles.dateValue}>15 نوفمبر 2024</Text>
-          <View style={styles.rowLabel}>
-            <Text style={styles.rowLabelText}>التاريخ</Text>
-            <MaterialCommunityIcons name="calendar-outline" color={colors.primary} size={24} />
-          </View>
+          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={24} />
         </Pressable>
+
+        <View style={styles.switchRow}>
+          <SwitchPreview isOn={isUnplanned} onPress={() => setIsUnplanned((value) => !value)} />
+          <View style={styles.switchTextGroup}>
+            <Text style={styles.switchLabel}>هذا المصروف موش في الخطة؟</Text>
+            <MaterialCommunityIcons name="information-outline" color={colors.mutedText} size={19} />
+          </View>
+        </View>
 
         <View style={styles.noteBox}>
           <Text style={styles.noteTitle}>ملاحظة (اختياري)</Text>
@@ -101,29 +92,10 @@ export default function ExpenseScreen() {
             style={styles.noteInput}
             value={note}
             onChangeText={setNote}
-            placeholder="مثلا: تاكسي للجامعة"
+            placeholder="مثال تاكسي للجامعة"
             placeholderTextColor={colors.mutedText}
             textAlign="right"
           />
-        </View>
-
-        <View style={styles.switchRow}>
-          <SwitchPreview isOn={isUnplanned} onPress={() => setIsUnplanned((value) => !value)} />
-          <View style={styles.switchTextGroup}>
-            <Text style={styles.switchLabel}>هذا المصروف موش في الخطة</Text>
-            <MaterialCommunityIcons name="information-outline" color={colors.primary} size={21} />
-          </View>
-        </View>
-
-        <View style={styles.impactCard}>
-          <View style={styles.impactIconWrap}>
-            <MaterialCommunityIcons name="chart-bar" color={colors.coral} size={46} />
-            <MaterialCommunityIcons name="arrow-up-right" color={colors.coral} size={24} style={styles.impactArrow} />
-          </View>
-          <Text style={styles.impactText}>
-            إذا تسجل هذا المصروف، الشهر الجاي يلزمك توفّر{" "}
-            <Text style={styles.impactAmount}>{formatMoney(nextMonthRequired)}</Text> باش تبقى في نفس الهدف.
-          </Text>
         </View>
 
         <Pressable onPress={handleSubmit} style={styles.submitButton}>
@@ -151,7 +123,7 @@ function CategoryCard({
       <MaterialCommunityIcons
         name={category.icon}
         color={isSelected ? colors.primary : "#B66651"}
-        size={32}
+        size={30}
       />
       <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
         {category.label}
@@ -179,259 +151,203 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   content: {
-    paddingHorizontal: 20,
-    paddingBottom: 28
+    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 16
   },
   header: {
-    minHeight: 80,
+    minHeight: 64,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between"
   },
-  iconButton: {
+  backButton: {
     width: 44,
     height: 44,
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center"
   },
-  logoHeader: {
-    width: 156,
-    height: 82
+  headerSpacer: {
+    width: 44
   },
   screenTitle: {
-    marginTop: 4,
     color: colors.primary,
-    fontSize: 34,
+    fontSize: 22,
     fontWeight: "900",
-    lineHeight: 44,
     textAlign: "center"
   },
-  formPanel: {
-    marginTop: 16,
-    borderRadius: 22,
-    padding: 14,
-    backgroundColor: colors.surface,
-    shadowColor: "#4B3B2D",
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 2
+  amountSection: {
+    marginTop: 4
   },
   fieldLabel: {
     color: colors.primary,
-    fontSize: 16,
-    fontWeight: "800",
+    fontSize: 14,
+    fontWeight: "900",
     textAlign: "right"
   },
   amountBox: {
-    minHeight: 76,
-    marginTop: 6,
+    minHeight: 58,
+    marginTop: 7,
     alignItems: "center",
-    flexDirection: "row",
     justifyContent: "center",
-    gap: 10,
-    borderRadius: 18,
-    backgroundColor: "#F3F1F4"
-  },
-  currency: {
-    color: colors.primary,
-    fontSize: 39,
-    fontWeight: "900",
-    lineHeight: 48
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    backgroundColor: colors.surface
   },
   amountInput: {
-    minWidth: 72,
+    width: "100%",
     color: colors.primary,
-    fontSize: 45,
+    fontSize: 20,
     fontWeight: "900",
-    lineHeight: 54,
     padding: 0
   },
-  categoryLabel: {
-    marginTop: 18
-  },
   categoryGrid: {
-    marginTop: 10,
+    marginTop: 16,
     flexDirection: "row-reverse",
     flexWrap: "wrap",
     gap: 10
   },
   categoryCard: {
-    width: "31.2%",
-    minHeight: 96,
+    width: "31%",
+    minHeight: 82,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: "transparent",
-    borderRadius: 16,
+    borderRadius: 14,
     backgroundColor: "#FFF3EE"
   },
   categoryCardSelected: {
-    borderColor: colors.primary,
+    borderColor: "#244ACF",
     backgroundColor: colors.lavender
   },
   categoryText: {
-    marginTop: 8,
+    marginTop: 7,
     color: colors.primary,
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "800",
     textAlign: "center"
   },
   categoryTextSelected: {
     fontWeight: "900"
   },
   dateRow: {
-    minHeight: 66,
-    marginTop: 12,
+    minHeight: 50,
+    marginTop: 14,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    backgroundColor: colors.surface
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface,
+    shadowColor: "#4B3B2D",
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 1
   },
   dateValue: {
     color: colors.primary,
-    fontSize: 19,
-    fontWeight: "800"
-  },
-  rowLabel: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8
-  },
-  rowLabelText: {
-    color: colors.primary,
     fontSize: 16,
-    fontWeight: "800"
-  },
-  noteBox: {
-    minHeight: 78,
-    marginTop: 12,
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    backgroundColor: colors.surface
-  },
-  noteTitle: {
-    color: colors.mutedText,
-    fontSize: 15,
-    fontWeight: "700",
-    textAlign: "right"
-  },
-  noteInput: {
-    color: colors.primary,
-    fontSize: 16,
-    fontWeight: "700",
-    paddingVertical: 4
+    fontWeight: "900",
+    textAlign: "center"
   },
   switchRow: {
-    minHeight: 66,
-    marginTop: 12,
+    minHeight: 48,
+    marginTop: 10,
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
-    borderRadius: 18,
-    paddingHorizontal: 16,
+    borderRadius: 12,
+    paddingHorizontal: 14,
     backgroundColor: colors.surface
   },
   switchTextGroup: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8
+    gap: 7
   },
   switchLabel: {
     color: colors.primary,
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: "900",
     textAlign: "right"
   },
   switchTrack: {
-    width: 66,
-    height: 36,
+    width: 56,
+    height: 32,
     justifyContent: "center",
-    borderRadius: 18,
+    borderRadius: 16,
     paddingHorizontal: 4
   },
   switchTrackOn: {
     alignItems: "flex-end",
-    backgroundColor: colors.primary
+    backgroundColor: "#244ACF"
   },
   switchTrackOff: {
     alignItems: "flex-start",
     backgroundColor: "#D9D6D0"
   },
   switchThumb: {
-    width: 29,
-    height: 29,
-    borderRadius: 15,
+    width: 25,
+    height: 25,
+    borderRadius: 13,
     backgroundColor: colors.surface
   },
   switchThumbOn: {
     shadowColor: colors.primary,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2
   },
   switchThumbOff: {
     shadowColor: "#4B3B2D",
-    shadowOpacity: 0.15,
-    shadowRadius: 5,
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1
   },
-  impactCard: {
-    minHeight: 118,
-    marginTop: 12,
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 16,
-    borderRadius: 20,
-    padding: 16,
-    backgroundColor: colors.softCoral
-  },
-  impactIconWrap: {
-    width: 86,
-    height: 76,
-    alignItems: "center",
+  noteBox: {
+    minHeight: 66,
+    marginTop: 10,
     justifyContent: "center",
-    borderRadius: 36,
-    backgroundColor: "rgba(255,255,255,0.62)"
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface
   },
-  impactArrow: {
-    position: "absolute",
-    right: 18,
-    top: 8
-  },
-  impactText: {
-    flex: 1,
-    color: colors.primary,
-    fontSize: 17,
-    fontWeight: "700",
-    lineHeight: 30,
+  noteTitle: {
+    color: colors.mutedText,
+    fontSize: 13,
+    fontWeight: "800",
     textAlign: "right"
   },
-  impactAmount: {
-    color: colors.coral,
-    fontWeight: "900"
+  noteInput: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "800",
+    padding: 0,
+    textAlign: "right"
   },
   submitButton: {
-    minHeight: 66,
+    minHeight: 56,
     marginTop: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 28,
+    borderRadius: 18,
     backgroundColor: colors.primary,
     shadowColor: colors.primary,
     shadowOpacity: 0.22,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
     elevation: 3
   },
   submitText: {
     color: colors.surface,
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "900",
     textAlign: "center"
   }
