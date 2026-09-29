@@ -5,7 +5,8 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="dark" />
-      <Stack initialRouteName="onboarding" screenOptions={{ headerShown: false }}>
+      <Stack initialRouteName="splash" screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="splash" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="setup" />
         <Stack.Screen name="(tabs)" />
