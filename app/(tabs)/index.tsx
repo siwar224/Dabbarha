@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { homePreviewData, type HomeExpensePreview, type HomeMetricPreview } from "@/constants/homePreviewData";
+import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
 
@@ -11,6 +13,7 @@ const walletHero = require("../../assets/images/wallet-hero-transparent.png");
 
 export default function HomeScreen() {
   const goal = homePreviewData.primaryGoal;
+  const { income } = useSetup();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -33,16 +36,21 @@ export default function HomeScreen() {
           <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
         </Pressable>
 
-        <View style={styles.salaryHero}>
+        <Pressable
+          onPress={() => router.push("/monthly/edit")}
+          style={styles.salaryHero}
+          accessibilityRole="button"
+          accessibilityLabel="تعديل الشهرية"
+        >
           <View style={styles.heroShapeLarge} />
           <View style={styles.heroShapeSmall} />
           <View style={styles.heroTextBlock}>
             <Text style={styles.heroLabel}>شهريتي</Text>
-            <Text style={styles.heroAmount}>{formatMoney(homePreviewData.salary)}</Text>
+            <Text style={styles.heroAmount}>{formatMoney(income)}</Text>
           </View>
           <Image source={walletHero} style={styles.heroImage} resizeMode="contain" />
           <MaterialCommunityIcons name="star-four-points" color={colors.gold} size={20} style={styles.heroSpark} />
-        </View>
+        </Pressable>
 
         <View style={styles.metricsRow}>
           {homePreviewData.metrics.map((metric) => (
