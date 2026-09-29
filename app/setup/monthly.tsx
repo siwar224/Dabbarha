@@ -17,7 +17,7 @@ export default function MonthlySetupScreen() {
 
   async function handleNext() {
     await setIncome(Number(salary) || 0);
-    router.push("/setup/plan");
+    router.replace("/setup/plan");
   }
 
   return (

@@ -159,7 +159,7 @@ export function SetupProvider({ children }: { children: ReactNode }) {
           categoryBudgets: plan.categoryBudgets,
           monthlyPlans
         });
-        await saveMonthlyPlan(plan);
+        void saveMonthlyPlan(plan).catch(() => undefined);
       };
       const selectMonth = (month: Date) => {
         const nextMonth = startOfMonth(month);
@@ -200,7 +200,7 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         setMonthlyPlan: saveActiveMonthlyPlan,
         setIncome: async (income: number) => {
           await saveActiveMonthlyPlan({ income });
-          await saveIncome(income);
+          void saveIncome(income).catch(() => undefined);
         },
         setAdvance: async (advance: number) => {
           await saveActiveMonthlyPlan({ advance });
@@ -227,7 +227,7 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         },
         setAllocations: async (allocations: SetupAllocation[]) => {
           await saveActiveMonthlyPlan({ allocations });
-          await saveAllocations(allocations);
+          void saveAllocations(allocations).catch(() => undefined);
         },
         setCategoryBudgets: async (categoryBudgets: SetupCategoryBudget[]) => {
           await saveActiveMonthlyPlan({ categoryBudgets });

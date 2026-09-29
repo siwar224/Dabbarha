@@ -74,7 +74,7 @@ export default function PlanSetupScreen() {
     if (total > income) {
       Alert.alert("تنبيه", "هاي يا معلّم، نقّص شوية مصروف، راك خلّيتها شهر هاذي 😂");
     }
-    router.push("/setup/goal");
+    router.replace("/setup/goal");
   }
 
   function openNewRow() {
