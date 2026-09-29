@@ -2,12 +2,17 @@ import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
+import { formatMoney } from "@/utils/formatMoney";
 
 const successCheck = require("../../assets/images/setup-success-check.png");
 const successWallet = require("../../assets/images/setup-success-wallet.png");
 
 export default function SetupSuccessScreen() {
+  const { income, allocations, goal, goalSkipped } = useSetup();
+  const totalPlan = allocations.reduce((sum, row) => sum + row.amount, 0);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.screen}>
@@ -24,8 +29,17 @@ export default function SetupSuccessScreen() {
         <View style={styles.copy}>
           <Text style={styles.title}>تم الإعداد بنجاح!</Text>
           <Text style={styles.subtitle}>
-            توا تنجم تبدأ تستعمل دبّرها وتعدّي في مصاريفك وأهدافك
+            توا تنجم تبدأ تستعمل دبّرها وتتابع مصاريفك وخطتك
           </Text>
+        </View>
+
+        <View style={styles.summaryCard}>
+          <SummaryRow label="الشهرية" value={formatMoney(income)} />
+          <SummaryRow label="الخطة" value={formatMoney(totalPlan)} />
+          <SummaryRow
+            label="الهدف"
+            value={goal ? goal.title : goalSkipped ? "تعملو لاحقًا" : "موش محدد"}
+          />
         </View>
 
         <View style={styles.walletWrap}>
@@ -39,6 +53,15 @@ export default function SetupSuccessScreen() {
         </Pressable>
       </View>
     </SafeAreaView>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.summaryRow}>
+      <Text style={styles.summaryValue}>{value}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
   );
 }
 
@@ -122,8 +145,38 @@ const styles = StyleSheet.create({
     lineHeight: 28,
     textAlign: "center"
   },
+  summaryCard: {
+    gap: 8,
+    marginTop: 18,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: colors.surface,
+    shadowColor: "#4B3B2D",
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2
+  },
+  summaryRow: {
+    minHeight: 32,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  summaryLabel: {
+    color: colors.mutedText,
+    fontSize: 15,
+    fontWeight: "800",
+    textAlign: "right"
+  },
+  summaryValue: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: "900",
+    textAlign: "left"
+  },
   walletWrap: {
-    height: 220,
+    height: 190,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 22,

@@ -1,100 +1,92 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
+import { router } from "expo-router";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { expenseCategories } from "@/constants/categories";
+import { MonthNavigator } from "@/components/MonthNavigator";
+import { useSetup, type SetupTransaction } from "@/context/SetupContext";
+import { calculateFinanceSummary, getMonthKey } from "@/services/financeService";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
+import { addMonths, formatMonthName } from "@/utils/month";
 
 const logoHeader = require("../../assets/images/logo-header.png");
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
+type AccountMetric = {
+  label: string;
+  amount: number;
+  icon: IconName;
+  tone: "green" | "coral" | "lavender";
+};
 
-const accountMetrics = [
-  {
-    label: "الدخل",
-    amount: 800,
-    icon: "arrow-top-right",
-    tone: "green"
-  },
-  {
-    label: "المصروف",
-    amount: 287,
-    icon: "arrow-down",
-    tone: "coral"
-  },
-  {
-    label: "الادخار",
-    amount: 513,
-    icon: "piggy-bank-outline",
-    tone: "lavender"
-  }
-] as const;
-
-const monthComparisons = [
-  { month: "أكتوبر", amount: 300, color: "#B9A4FF", progress: 0.6 },
-  { month: "نوفمبر", amount: 500, color: colors.coral, progress: 1 },
-  { month: "ديسمبر", amount: 500, color: "#B9A4FF", progress: 1 }
-] as const;
-
-const transactions = [
-  {
-    id: "transport",
-    title: "ترانسبور",
-    date: "12 نوفمبر",
-    amount: 4,
-    icon: "bus",
-    backgroundColor: colors.softCoral,
-    iconColor: colors.coral
-  },
-  {
-    id: "coffee",
-    title: "قهوة",
-    date: "12 نوفمبر",
-    amount: 3,
-    icon: "coffee",
-    backgroundColor: colors.lavender,
-    iconColor: "#756BD8"
-  },
-  {
-    id: "care",
-    title: "عناية",
-    date: "11 نوفمبر",
-    amount: 45,
-    icon: "shopping-outline",
-    backgroundColor: "#FFE4EF",
-    iconColor: "#EF6FA0"
-  }
-] as const;
-
-const categoryBreakdown = [
-  {
-    label: "تغذية",
-    amount: 115,
-    percentage: 40,
-    icon: "silverware-fork-knife",
-    color: colors.coral,
-    backgroundColor: colors.softCoral
-  },
-  {
-    label: "ترانسبور",
-    amount: 80,
-    percentage: 28,
-    icon: "bus",
-    color: colors.coral,
-    backgroundColor: colors.softCoral
-  },
-  {
-    label: "مشتريات",
-    amount: 52,
-    percentage: 18,
-    icon: "shopping-outline",
-    color: "#A994F5",
-    backgroundColor: colors.lavender
-  }
-] as const;
+type CategoryBreakdownItem = {
+  label: string;
+  amount: number;
+  percentage: number;
+  icon: IconName;
+  color: string;
+  backgroundColor: string;
+};
 
 export default function AccountsScreen() {
+  const { income, allocations, categoryBudgets, transactions, selectedMonth } = useSetup();
+  const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth, categoryBudgets);
+  const spent = summary.totalSpent;
+  const savings = summary.remainingSavings;
+  const latestTransactions = summary.monthTransactions.slice(0, 3);
+  const comparisonMonths = [-1, 0, 1].map((offset) => addMonths(selectedMonth, offset));
+  const comparisonAmounts = comparisonMonths.map((month) =>
+    transactions
+      .filter((transaction) => getMonthKey(transaction.date) === getMonthKey(month))
+      .reduce((sum, transaction) => sum + transaction.amount, 0)
+  );
+  const comparisonMax = Math.max(...comparisonAmounts, 1);
+  const monthComparisons = comparisonMonths.map((month, index) => ({
+    month: formatMonthName(month),
+    amount: comparisonAmounts[index],
+    color: index === 1 ? colors.coral : "#B9A4FF",
+    progress: comparisonAmounts[index] / comparisonMax
+  }));
+  const accountMetrics: AccountMetric[] = [
+    {
+      label: "الدخل",
+      amount: income,
+      icon: "arrow-top-right",
+      tone: "green"
+    },
+    {
+      label: "المصروف",
+      amount: spent,
+      icon: "arrow-down",
+      tone: "coral"
+    },
+    {
+      label: "الادخار",
+      amount: savings,
+      icon: "piggy-bank-outline",
+      tone: "lavender"
+    }
+  ];
+  const categoryBreakdown: CategoryBreakdownItem[] = expenseCategories
+    .map((category, index) => {
+      const amount = summary.monthTransactions
+        .filter((transaction) => transaction.category === category.id)
+        .reduce((sum, transaction) => sum + transaction.amount, 0);
+
+      return {
+        label: category.label,
+        amount,
+        percentage: spent > 0 ? Math.round((amount / spent) * 100) : 0,
+        icon: category.icon,
+        color: index % 2 === 0 ? colors.coral : "#A994F5",
+        backgroundColor: index % 2 === 0 ? colors.softCoral : colors.lavender
+      };
+    })
+    .filter((category) => category.amount > 0);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -110,11 +102,7 @@ export default function AccountsScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={22} />
-          <Text style={styles.monthText}>نوفمبر 2024</Text>
-          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
-        </Pressable>
+        <MonthNavigator />
 
         <View style={styles.metricsRow}>
           {accountMetrics.map((metric) => (
@@ -167,9 +155,13 @@ export default function AccountsScreen() {
           </View>
 
           <View style={styles.transactionsList}>
-            {transactions.map((transaction) => (
-              <TransactionRow key={transaction.id} transaction={transaction} />
-            ))}
+            {latestTransactions.length > 0 ? (
+              latestTransactions.map((transaction) => (
+                <TransactionRow key={transaction.id} transaction={transaction} />
+              ))
+            ) : (
+              <Text style={styles.emptyText}>ما فماش عمليات مسجلة</Text>
+            )}
           </View>
         </View>
 
@@ -187,9 +179,13 @@ export default function AccountsScreen() {
           </View>
 
           <View style={styles.categoryList}>
-            {categoryBreakdown.map((category) => (
-              <CategoryBreakdownRow key={category.label} category={category} />
-            ))}
+            {categoryBreakdown.length > 0 ? (
+              categoryBreakdown.map((category) => (
+                <CategoryBreakdownRow key={category.label} category={category} />
+              ))
+            ) : (
+              <Text style={styles.emptyText}>المصروف حسب الفئة يظهر بعد أول عملية</Text>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -197,7 +193,7 @@ export default function AccountsScreen() {
   );
 }
 
-function MetricCard({ metric }: { metric: (typeof accountMetrics)[number] }) {
+function MetricCard({ metric }: { metric: AccountMetric }) {
   const toneStyle = metricToneStyles[metric.tone];
   const iconColor = metricIconColors[metric.tone];
 
@@ -215,20 +211,22 @@ function MetricCard({ metric }: { metric: (typeof accountMetrics)[number] }) {
 function TransactionRow({
   transaction
 }: {
-  transaction: (typeof transactions)[number];
+  transaction: SetupTransaction;
 }) {
+  const category = expenseCategories.find((item) => item.id === transaction.category);
+
   return (
-    <Pressable style={styles.transactionRow}>
+    <Pressable onPress={() => router.push({ pathname: "/expense/edit", params: { id: transaction.id } })} style={styles.transactionRow}>
       <MaterialCommunityIcons name="chevron-left" color={colors.primary} size={24} />
       <Text style={styles.transactionAmount}>{formatMoney(transaction.amount)}</Text>
 
       <View style={styles.transactionInfo}>
         <View style={styles.transactionText}>
-          <Text style={styles.transactionTitle}>{transaction.title}</Text>
-          <Text style={styles.transactionDate}>{transaction.date}</Text>
+          <Text style={styles.transactionTitle}>{category?.label ?? "مصروف"}</Text>
+          <Text style={styles.transactionDate}>{new Date(transaction.date).toLocaleDateString("ar-TN", { day: "numeric", month: "long" })}</Text>
         </View>
-        <View style={[styles.transactionIcon, { backgroundColor: transaction.backgroundColor }]}>
-          <MaterialCommunityIcons name={transaction.icon} color={transaction.iconColor} size={24} />
+        <View style={[styles.transactionIcon, { backgroundColor: transaction.isUnplanned ? colors.softCoral : colors.lavender }]}>
+          <MaterialCommunityIcons name={category?.icon ?? "cash"} color={transaction.isUnplanned ? colors.coral : colors.primary} size={24} />
         </View>
       </View>
     </Pressable>
@@ -238,7 +236,7 @@ function TransactionRow({
 function CategoryBreakdownRow({
   category
 }: {
-  category: (typeof categoryBreakdown)[number];
+  category: CategoryBreakdownItem;
 }) {
   return (
     <View style={styles.categoryRow}>
@@ -497,6 +495,13 @@ const styles = StyleSheet.create({
   },
   transactionsList: {
     marginTop: 2
+  },
+  emptyText: {
+    color: colors.mutedText,
+    fontSize: 15,
+    fontWeight: "800",
+    paddingVertical: 18,
+    textAlign: "center"
   },
   transactionRow: {
     minHeight: 66,

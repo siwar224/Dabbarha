@@ -1,42 +1,29 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
+import { router } from "expo-router";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { MonthNavigator } from "@/components/MonthNavigator";
+import { useSetup, type SetupAllocation } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
+import { addMonths, formatMonthName } from "@/utils/month";
+
+type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 
 const logoHeader = require("../../assets/images/logo-header.png");
 const planWallet = require("../../assets/images/wallet-plan.png");
 const phoneGoal = require("../../assets/images/phone-goal.png");
 
-const allocationRows = [
-  {
-    label: "مصروفك ثابت",
-    amount: 200,
-    icon: "home-outline",
-    tone: "coral"
-  },
-  {
-    label: "مصاريف زايدة",
-    amount: 100,
-    icon: "cart-outline",
-    tone: "lavender"
-  },
-  {
-    label: "ادخار مستهدف",
-    amount: 500,
-    icon: "target",
-    tone: "blue"
-  }
-] as const;
-
-const upcomingMonths = [
-  { month: "أكتوبر", amount: 300, color: colors.coral, background: colors.softCoral, progress: 0.44 },
-  { month: "نوفمبر", amount: 500, color: "#756BD8", background: colors.lavender, progress: 0.56 },
-  { month: "ديسمبر", amount: 500, color: "#76B8FF", background: colors.softBlue, progress: 0.98 }
-] as const;
-
 export default function PlanScreen() {
+  const { income, advance, allocations, goal, selectedMonth } = useSetup();
+  const upcomingMonths = [
+    { month: formatMonthName(addMonths(selectedMonth, 0)), amount: 300, color: colors.coral, background: colors.softCoral, progress: 0.44 },
+    { month: formatMonthName(addMonths(selectedMonth, 1)), amount: 500, color: "#756BD8", background: colors.lavender, progress: 0.56 },
+    { month: formatMonthName(addMonths(selectedMonth, 2)), amount: 500, color: "#76B8FF", background: colors.softBlue, progress: 0.98 }
+  ];
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -52,11 +39,7 @@ export default function PlanScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={22} />
-          <Text style={styles.monthText}>نوفمبر 2024</Text>
-          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
-        </Pressable>
+        <MonthNavigator />
 
         <View style={styles.titleWrap}>
           <MaterialCommunityIcons name="star-four-points" color={colors.coral} size={18} />
@@ -73,10 +56,10 @@ export default function PlanScreen() {
 
           <View style={styles.salaryTextBlock}>
             <Text style={styles.salaryLabel}>شهريتي الحالية</Text>
-            <Text style={styles.salaryAmount}>{formatMoney(800)}</Text>
+            <Text style={styles.salaryAmount}>{formatMoney(income)}</Text>
             <View style={styles.growthPill}>
-              <MaterialCommunityIcons name="chart-line-variant" color={colors.surface} size={20} />
-              <Text style={styles.growthText}>من جانفي تولّي 1000 د</Text>
+              <MaterialCommunityIcons name="cash-fast" color={colors.surface} size={20} />
+              <Text style={styles.growthText}>{advance > 0 ? `تسلّمت مسبقًا ${formatMoney(advance)}` : "خطة الشهر الحالية"}</Text>
             </View>
           </View>
         </View>
@@ -87,16 +70,21 @@ export default function PlanScreen() {
             <View style={styles.donutCenter}>
               <Text style={styles.donutLabel}>توزيع</Text>
               <Text style={styles.donutLabel}>شهريتي</Text>
-              <Text style={styles.donutAmount}>{formatMoney(800)}</Text>
+              <Text style={styles.donutAmount}>{formatMoney(income)}</Text>
             </View>
           </View>
 
           <View style={styles.allocationList}>
-            {allocationRows.map((item) => (
-              <AllocationRow key={item.label} item={item} />
+            {allocations.map((item) => (
+              <AllocationRow key={item.id} item={item} />
             ))}
           </View>
         </View>
+
+        <Pressable onPress={() => router.push("/monthly/plan")} style={styles.editPlanButton}>
+          <Text style={styles.editPlanText}>تعديل خطة الشهر</Text>
+          <MaterialCommunityIcons name="pencil-outline" color={colors.surface} size={22} />
+        </Pressable>
 
         <View style={styles.monthsCard}>
           <View style={styles.sectionHeader}>
@@ -130,8 +118,8 @@ export default function PlanScreen() {
           </View>
 
           <Text style={styles.forecastText}>
-            إذا تمشي على الخطة، تنجم توصل لهدف التليفون{" "}
-            <Text style={styles.forecastHighlight}>في ديسمبر</Text>
+            إذا تمشي على الخطة، تنجم توصل لهدف {goal?.title ?? "التليفون"}{" "}
+            <Text style={styles.forecastHighlight}>{goal?.targetDate ?? "في ديسمبر"}</Text>
           </Text>
           <Text style={styles.celebration}>🎉</Text>
         </View>
@@ -143,7 +131,7 @@ export default function PlanScreen() {
 function AllocationRow({
   item
 }: {
-  item: (typeof allocationRows)[number];
+  item: SetupAllocation;
 }) {
   const toneStyle = allocationToneStyles[item.tone];
   const iconColor = allocationIconColors[item.tone];
@@ -153,7 +141,7 @@ function AllocationRow({
       <Text style={[styles.allocationAmount, { color: iconColor }]}>{formatMoney(item.amount)}</Text>
       <View style={styles.allocationLabelWrap}>
         <Text style={styles.allocationLabel}>{item.label}</Text>
-        <MaterialCommunityIcons name={item.icon} color={iconColor} size={27} />
+        <MaterialCommunityIcons name={item.icon as IconName} color={iconColor} size={27} />
       </View>
     </View>
   );
@@ -178,13 +166,17 @@ const allocationToneStyles = StyleSheet.create({
   },
   blue: {
     backgroundColor: colors.softBlue
+  },
+  gold: {
+    backgroundColor: colors.softGold
   }
 });
 
 const allocationIconColors = {
   coral: "#B34F3E",
   lavender: "#37318C",
-  blue: colors.primary
+  blue: colors.primary,
+  gold: "#8A5A1D"
 } as const;
 
 const styles = StyleSheet.create({
@@ -425,6 +417,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "800",
     textAlign: "right"
+  },
+  editPlanButton: {
+    minHeight: 58,
+    marginTop: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 10,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 3
+  },
+  editPlanText: {
+    color: colors.surface,
+    fontSize: 18,
+    fontWeight: "900",
+    textAlign: "center"
   },
   monthsCard: {
     marginTop: 14,

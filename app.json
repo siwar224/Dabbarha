@@ -19,7 +19,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Dabbirha a besoin d'accéder à vos photos pour ajouter une image à votre objectif."
+        }
+      ]
     ]
   }
 }
