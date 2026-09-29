@@ -12,11 +12,15 @@ export type SetupAllocation = {
 };
 
 export type SetupGoal = {
+  id: string;
   title: string;
   targetAmount: number;
   savedAmount: number;
   targetDate?: string;
+  imageUri?: string;
 };
+
+export type SetupGoalInput = Omit<SetupGoal, "id">;
 
 export type SetupTransaction = {
   id: string;
@@ -32,6 +36,7 @@ type SetupData = {
   income: number;
   allocations: SetupAllocation[];
   goal?: SetupGoal;
+  goals: SetupGoal[];
   goalSkipped: boolean;
   transactions: SetupTransaction[];
 };
@@ -40,7 +45,9 @@ type SetupContextValue = SetupData & {
   isLoaded: boolean;
   setIncome: (income: number) => Promise<void>;
   setAllocations: (allocations: SetupAllocation[]) => Promise<void>;
-  setGoal: (goal: SetupGoal) => Promise<void>;
+  setGoal: (goal: SetupGoalInput) => Promise<void>;
+  addGoal: (goal: SetupGoalInput) => Promise<string>;
+  updateGoal: (goalId: string, goal: SetupGoalInput) => Promise<void>;
   skipGoal: () => Promise<void>;
   addTransaction: (transaction: Omit<SetupTransaction, "id" | "createdAt">) => Promise<void>;
 };
@@ -72,6 +79,7 @@ const defaultSetupData: SetupData = {
       tone: "blue"
     }
   ],
+  goals: [],
   goalSkipped: false,
   transactions: []
 };
@@ -91,6 +99,7 @@ export function SetupProvider({ children }: { children: ReactNode }) {
           setData({
             ...defaultSetupData,
             ...parsed,
+            goals: parsed.goals ?? (parsed.goal ? [parsed.goal] : []),
             transactions: parsed.transactions ?? []
           });
         }
@@ -117,8 +126,43 @@ export function SetupProvider({ children }: { children: ReactNode }) {
       setAllocations: async (allocations: SetupAllocation[]) => {
         await updateData({ ...data, allocations });
       },
-      setGoal: async (goal: SetupGoal) => {
-        await updateData({ ...data, goal, goalSkipped: false });
+      setGoal: async (goal: SetupGoalInput) => {
+        const configuredGoal: SetupGoal = {
+          ...goal,
+          id: data.goal?.id ?? data.goals[0]?.id ?? `${Date.now()}`
+        };
+        const goals = data.goals.some((item) => item.id === configuredGoal.id)
+          ? data.goals.map((item) => (item.id === configuredGoal.id ? configuredGoal : item))
+          : [configuredGoal, ...data.goals];
+
+        await updateData({ ...data, goal: configuredGoal, goals, goalSkipped: false });
+      },
+      addGoal: async (goal: SetupGoalInput) => {
+        const newGoal: SetupGoal = {
+          ...goal,
+          id: `${Date.now()}`
+        };
+
+        await updateData({
+          ...data,
+          goal: data.goal ?? newGoal,
+          goals: [newGoal, ...data.goals],
+          goalSkipped: false
+        });
+
+        return newGoal.id;
+      },
+      updateGoal: async (goalId: string, goal: SetupGoalInput) => {
+        const updatedGoal: SetupGoal = {
+          ...goal,
+          id: goalId
+        };
+
+        await updateData({
+          ...data,
+          goal: data.goal?.id === goalId ? updatedGoal : data.goal,
+          goals: data.goals.map((item) => (item.id === goalId ? updatedGoal : item))
+        });
       },
       skipGoal: async () => {
         await updateData({ ...data, goal: undefined, goalSkipped: true });

@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSetup } from "@/context/SetupContext";
@@ -15,7 +15,7 @@ type DisplayGoal = {
   id: string;
   title: string;
   icon: "cellphone" | "shield-outline" | "target";
-  image: typeof phoneGoal;
+  image: ImageSourcePropType;
   target: number;
   saved: number;
   remaining?: number;
@@ -54,23 +54,22 @@ const goals = [
 ] as const;
 
 export default function GoalsScreen() {
-  const { goal, goalSkipped } = useSetup();
-  const displayGoals: DisplayGoal[] = goal
-    ? [
-        {
-          id: "configured",
-          title: goal.title,
-          icon: "target",
-          image: phoneGoal,
-          target: goal.targetAmount,
-          saved: goal.savedAmount,
-          remaining: Math.max(goal.targetAmount - goal.savedAmount, 0),
-          progress: Math.min(goal.savedAmount / Math.max(goal.targetAmount, 1), 1),
-          fill: colors.coral,
-          showRemaining: true,
-          estimate: goal.targetDate ? `تقدير: ${goal.targetDate}` : undefined
-        }
-      ]
+  const { goal, goals: savedGoals, goalSkipped } = useSetup();
+  const activeGoals = savedGoals.length > 0 ? savedGoals : goal ? [goal] : [];
+  const displayGoals: DisplayGoal[] = activeGoals.length > 0
+    ? activeGoals.map((item) => ({
+        id: item.id,
+        title: item.title,
+        icon: "target",
+        image: item.imageUri ? { uri: item.imageUri } : phoneGoal,
+        target: item.targetAmount,
+        saved: item.savedAmount,
+        remaining: Math.max(item.targetAmount - item.savedAmount, 0),
+        progress: Math.min(item.savedAmount / Math.max(item.targetAmount, 1), 1),
+        fill: colors.coral,
+        showRemaining: true,
+        estimate: item.targetDate ? `تقدير: ${item.targetDate}` : undefined
+      }))
     : goalSkipped
       ? []
       : goals.map((item) => ({ ...item }));
@@ -132,7 +131,7 @@ export default function GoalsScreen() {
           </View>
         </View>
 
-        <Pressable onPress={() => router.push("/setup/goal")} style={styles.addButton}>
+        <Pressable onPress={() => router.push("/goal/add")} style={styles.addButton}>
           <Text style={styles.addText}>زيد هدف</Text>
           <View style={styles.addIcon}>
             <MaterialCommunityIcons name="plus" color={colors.primary} size={28} />
@@ -145,7 +144,10 @@ export default function GoalsScreen() {
 
 function GoalCard({ goal }: { goal: DisplayGoal }) {
   return (
-    <Pressable style={styles.goalCard}>
+    <Pressable
+      onPress={() => router.push({ pathname: "/goal/[id]", params: { id: goal.id } })}
+      style={styles.goalCard}
+    >
       <View style={styles.goalImageWrap}>
         <Image source={goal.image} style={styles.goalImage} resizeMode="contain" />
         {goal.id === "phone" ? (
