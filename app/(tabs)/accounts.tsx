@@ -27,88 +27,10 @@ type CategoryBreakdownItem = {
   backgroundColor: string;
 };
 
-const accountMetrics = [
-  {
-    label: "الدخل",
-    amount: 800,
-    icon: "arrow-top-right",
-    tone: "green"
-  },
-  {
-    label: "المصروف",
-    amount: 287,
-    icon: "arrow-down",
-    tone: "coral"
-  },
-  {
-    label: "الادخار",
-    amount: 513,
-    icon: "piggy-bank-outline",
-    tone: "lavender"
-  }
-] as const;
-
 const monthComparisons = [
   { month: "أكتوبر", amount: 300, color: "#B9A4FF", progress: 0.6 },
   { month: "نوفمبر", amount: 500, color: colors.coral, progress: 1 },
   { month: "ديسمبر", amount: 500, color: "#B9A4FF", progress: 1 }
-] as const;
-
-const transactions = [
-  {
-    id: "transport",
-    title: "ترانسبور",
-    date: "12 نوفمبر",
-    amount: 4,
-    icon: "bus",
-    backgroundColor: colors.softCoral,
-    iconColor: colors.coral
-  },
-  {
-    id: "coffee",
-    title: "قهوة",
-    date: "12 نوفمبر",
-    amount: 3,
-    icon: "coffee",
-    backgroundColor: colors.lavender,
-    iconColor: "#756BD8"
-  },
-  {
-    id: "care",
-    title: "عناية",
-    date: "11 نوفمبر",
-    amount: 45,
-    icon: "shopping-outline",
-    backgroundColor: "#FFE4EF",
-    iconColor: "#EF6FA0"
-  }
-] as const;
-
-const categoryBreakdown = [
-  {
-    label: "تغذية",
-    amount: 115,
-    percentage: 40,
-    icon: "silverware-fork-knife",
-    color: colors.coral,
-    backgroundColor: colors.softCoral
-  },
-  {
-    label: "ترانسبور",
-    amount: 80,
-    percentage: 28,
-    icon: "bus",
-    color: colors.coral,
-    backgroundColor: colors.softCoral
-  },
-  {
-    label: "مشتريات",
-    amount: 52,
-    percentage: 18,
-    icon: "shopping-outline",
-    color: "#A994F5",
-    backgroundColor: colors.lavender
-  }
 ] as const;
 
 export default function AccountsScreen() {

@@ -28,6 +28,8 @@
   },
   "devDependencies": {
     "@types/react": "latest",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~57.0.2",
     "typescript": "~5.9.2"
   }
 }

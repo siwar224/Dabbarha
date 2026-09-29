@@ -1,6 +1,14 @@
 export const DATABASE_NAME = "dabbirha.db";
 
+export const DATABASE_VERSION = 1;
+
 export const migrations = [
+  `
+  CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY NOT NULL,
+    value TEXT NOT NULL
+  );
+  `,
   `
   CREATE TABLE IF NOT EXISTS monthly_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,7 +24,7 @@ export const migrations = [
   `,
   `
   CREATE TABLE IF NOT EXISTS transactions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY NOT NULL,
     amount REAL NOT NULL,
     category TEXT NOT NULL,
     date TEXT NOT NULL,
@@ -27,11 +35,13 @@ export const migrations = [
   `,
   `
   CREATE TABLE IF NOT EXISTS goals (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id TEXT PRIMARY KEY NOT NULL,
     title TEXT NOT NULL,
     targetAmount REAL NOT NULL,
-    initialSavedAmount REAL NOT NULL DEFAULT 0,
+    savedAmount REAL NOT NULL DEFAULT 0,
     targetDate TEXT,
+    imageUri TEXT,
+    isPrimary INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'active',
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL
@@ -54,6 +64,16 @@ export const migrations = [
     name TEXT NOT NULL,
     icon TEXT,
     type TEXT NOT NULL
+  );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS monthly_allocations (
+    id TEXT PRIMARY KEY NOT NULL,
+    label TEXT NOT NULL,
+    amount REAL NOT NULL,
+    icon TEXT NOT NULL,
+    tone TEXT NOT NULL,
+    sortOrder INTEGER NOT NULL DEFAULT 0
   );
   `
 ] as const;

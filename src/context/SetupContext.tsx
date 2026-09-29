@@ -1,45 +1,18 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import type { ExpenseCategory } from "@/types/finance";
+import {
+  loadSetupData,
+  saveAllocations,
+  saveGoal,
+  saveGoalSkipped,
+  saveIncome,
+  savePrimaryGoal,
+  saveTransaction,
+  saveUpdatedGoal
+} from "@/db";
+import type { SetupAllocation, SetupData, SetupGoal, SetupGoalInput, SetupTransaction } from "@/types/setup";
 
-export type SetupAllocation = {
-  id: string;
-  label: string;
-  amount: number;
-  icon: "home-outline" | "cart-outline" | "target" | "cash-multiple";
-  tone: "coral" | "lavender" | "blue" | "gold";
-};
-
-export type SetupGoal = {
-  id: string;
-  title: string;
-  targetAmount: number;
-  savedAmount: number;
-  targetDate?: string;
-  imageUri?: string;
-};
-
-export type SetupGoalInput = Omit<SetupGoal, "id">;
-
-export type SetupTransaction = {
-  id: string;
-  amount: number;
-  category: ExpenseCategory;
-  date: string;
-  note?: string;
-  isUnplanned: boolean;
-  createdAt: string;
-};
-
-type SetupData = {
-  income: number;
-  allocations: SetupAllocation[];
-  goal?: SetupGoal;
-  goals: SetupGoal[];
-  goalSkipped: boolean;
-  transactions: SetupTransaction[];
-};
+export type { SetupAllocation, SetupGoal, SetupGoalInput, SetupTransaction } from "@/types/setup";
 
 type SetupContextValue = SetupData & {
   isLoaded: boolean;
@@ -51,8 +24,6 @@ type SetupContextValue = SetupData & {
   skipGoal: () => Promise<void>;
   addTransaction: (transaction: Omit<SetupTransaction, "id" | "createdAt">) => Promise<void>;
 };
-
-const STORAGE_KEY = "dabbirha.setup.v1";
 
 const defaultSetupData: SetupData = {
   income: 800,
@@ -91,29 +62,19 @@ export function SetupProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    async function loadSetupData() {
+    async function hydrateSetupData() {
       try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          setData({
-            ...defaultSetupData,
-            ...parsed,
-            goals: parsed.goals ?? (parsed.goal ? [parsed.goal] : []),
-            transactions: parsed.transactions ?? []
-          });
-        }
+        setData(await loadSetupData(defaultSetupData));
       } finally {
         setIsLoaded(true);
       }
     }
 
-    loadSetupData();
+    hydrateSetupData();
   }, []);
 
-  const updateData = useCallback(async (nextData: SetupData) => {
+  const updateData = useCallback((nextData: SetupData) => {
     setData(nextData);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(nextData));
   }, []);
 
   const value = useMemo<SetupContextValue>(
@@ -121,10 +82,14 @@ export function SetupProvider({ children }: { children: ReactNode }) {
       ...data,
       isLoaded,
       setIncome: async (income: number) => {
-        await updateData({ ...data, income });
+        const nextData = { ...data, income };
+        updateData(nextData);
+        await saveIncome(income);
       },
       setAllocations: async (allocations: SetupAllocation[]) => {
-        await updateData({ ...data, allocations });
+        const nextData = { ...data, allocations };
+        updateData(nextData);
+        await saveAllocations(allocations);
       },
       setGoal: async (goal: SetupGoalInput) => {
         const configuredGoal: SetupGoal = {
@@ -135,7 +100,9 @@ export function SetupProvider({ children }: { children: ReactNode }) {
           ? data.goals.map((item) => (item.id === configuredGoal.id ? configuredGoal : item))
           : [configuredGoal, ...data.goals];
 
-        await updateData({ ...data, goal: configuredGoal, goals, goalSkipped: false });
+        const nextData = { ...data, goal: configuredGoal, goals, goalSkipped: false };
+        updateData(nextData);
+        await savePrimaryGoal(configuredGoal, goals);
       },
       addGoal: async (goal: SetupGoalInput) => {
         const newGoal: SetupGoal = {
@@ -143,12 +110,15 @@ export function SetupProvider({ children }: { children: ReactNode }) {
           id: `${Date.now()}`
         };
 
-        await updateData({
+        const nextData = {
           ...data,
           goal: data.goal ?? newGoal,
           goals: [newGoal, ...data.goals],
           goalSkipped: false
-        });
+        };
+
+        updateData(nextData);
+        await saveGoal(newGoal, !data.goal);
 
         return newGoal.id;
       },
@@ -158,27 +128,33 @@ export function SetupProvider({ children }: { children: ReactNode }) {
           id: goalId
         };
 
-        await updateData({
+        const nextData = {
           ...data,
           goal: data.goal?.id === goalId ? updatedGoal : data.goal,
           goals: data.goals.map((item) => (item.id === goalId ? updatedGoal : item))
-        });
+        };
+
+        updateData(nextData);
+        await saveUpdatedGoal(goalId, goal);
       },
       skipGoal: async () => {
-        await updateData({ ...data, goal: undefined, goalSkipped: true });
+        const nextData = { ...data, goal: undefined, goalSkipped: true };
+        updateData(nextData);
+        await saveGoalSkipped();
       },
       addTransaction: async (transaction) => {
-        await updateData({
+        const savedTransaction = {
+          ...transaction,
+          id: `${Date.now()}`,
+          createdAt: new Date().toISOString()
+        };
+        const nextData = {
           ...data,
-          transactions: [
-            {
-              ...transaction,
-              id: `${Date.now()}`,
-              createdAt: new Date().toISOString()
-            },
-            ...data.transactions
-          ]
-        });
+          transactions: [savedTransaction, ...data.transactions]
+        };
+
+        updateData(nextData);
+        await saveTransaction(savedTransaction);
       }
     }),
     [data, isLoaded, updateData]
