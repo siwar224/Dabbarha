@@ -1,16 +1,73 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import type { ComponentProps } from "react";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { homePreviewData, type HomeExpensePreview, type HomeMetricPreview } from "@/constants/homePreviewData";
+import { expenseCategories } from "@/constants/categories";
+import { MonthNavigator } from "@/components/MonthNavigator";
+import { useSetup } from "@/context/SetupContext";
+import { calculateFinanceSummary } from "@/services/financeService";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
+import { formatDay } from "@/utils/month";
 
 const logoHeader = require("../../assets/images/logo-header.png");
 const walletHero = require("../../assets/images/wallet-hero-transparent.png");
 
+type HomeMetricPreview = {
+  label: string;
+  amount: number;
+  icon: ComponentProps<typeof MaterialCommunityIcons>["name"];
+  tone: "lavender" | "gold" | "coral";
+};
+
 export default function HomeScreen() {
-  const goal = homePreviewData.primaryGoal;
+  const { addGoalContribution, income, advance, allocations, categoryBudgets, goal, transactions, selectedMonth } = useSetup();
+  const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth, categoryBudgets);
+  const activeGoal = goal ?? {
+    title: "هدفي: تليفون",
+    targetAmount: 950,
+    savedAmount: 300
+  };
+  const goalProgress = Math.min(activeGoal.savedAmount / Math.max(activeGoal.targetAmount, 1), 1);
+  const latestExpenses = summary.monthTransactions.slice(0, 3);
+
+  function handleGoalContribution() {
+    if (!goal || summary.remainingSavings <= 0) {
+      return;
+    }
+    Alert.alert("إضافة للهدف", `تحب تضيف ${formatMoney(summary.remainingSavings)} لهدفك؟`, [
+      { text: "إلغاء", style: "cancel" },
+      {
+        text: "إضافة",
+        onPress: async () => {
+          await addGoalContribution(summary.remainingSavings);
+        }
+      }
+    ]);
+  }
+
+  const metrics: HomeMetricPreview[] = [
+    {
+      label: "صرفت",
+      amount: summary.totalSpent,
+      icon: "chart-bar",
+      tone: "coral"
+    },
+    {
+      label: "وفّرت",
+      amount: summary.remainingSavings,
+      icon: "piggy-bank-outline",
+      tone: "gold"
+    },
+    {
+      label: "باقيلي",
+      amount: summary.remainingPlanned,
+      icon: "clock-outline",
+      tone: "lavender"
+    }
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -27,28 +84,32 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={22} />
-          <Text style={styles.monthText}>{homePreviewData.month}</Text>
-          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
-        </Pressable>
+        <MonthNavigator />
 
-        <View style={styles.salaryHero}>
+        <Pressable
+          onPress={() => router.push("/monthly/edit")}
+          style={styles.salaryHero}
+          accessibilityRole="button"
+          accessibilityLabel="تعديل الشهرية"
+        >
           <View style={styles.heroShapeLarge} />
           <View style={styles.heroShapeSmall} />
           <View style={styles.heroTextBlock}>
             <Text style={styles.heroLabel}>شهريتي</Text>
-            <Text style={styles.heroAmount}>{formatMoney(homePreviewData.salary)}</Text>
+            <Text style={styles.heroAmount}>{formatMoney(income)}</Text>
+            {advance > 0 ? <Text style={styles.heroAdvance}>منها avance {formatMoney(advance)}</Text> : null}
           </View>
           <Image source={walletHero} style={styles.heroImage} resizeMode="contain" />
           <MaterialCommunityIcons name="star-four-points" color={colors.gold} size={20} style={styles.heroSpark} />
-        </View>
+        </Pressable>
 
         <View style={styles.metricsRow}>
-          {homePreviewData.metrics.map((metric) => (
+          {metrics.map((metric) => (
             <MetricCard key={metric.label} metric={metric} />
           ))}
         </View>
+
+        <BudgetStatusCard summary={summary} />
 
         <Pressable style={styles.goalCard}>
           <View style={styles.goalIconWrap}>
@@ -61,23 +122,30 @@ export default function HomeScreen() {
               <View style={styles.goalBadge}>
                 <MaterialCommunityIcons name="cellphone" color={colors.primary} size={22} />
               </View>
-              <Text style={styles.goalTitle}>{goal.title}</Text>
+              <Text style={styles.goalTitle}>هدفي: {activeGoal.title}</Text>
             </View>
             <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${goal.progress * 100}%` }]} />
+              <View style={[styles.progressFill, { width: `${goalProgress * 100}%` }]} />
             </View>
             <View style={styles.goalNumbers}>
-              <Text style={styles.goalNumber}>{formatMoney(goal.remainingAmount)} باقي</Text>
+              <Text style={styles.goalNumber}>{formatMoney(Math.max(activeGoal.targetAmount - activeGoal.savedAmount, 0))} باقي</Text>
               <Text style={styles.goalNumber}>
-                {goal.savedAmount} / {formatMoney(goal.targetAmount)}
+                {formatMoney(activeGoal.savedAmount)} / {formatMoney(activeGoal.targetAmount)}
               </Text>
             </View>
           </View>
         </Pressable>
 
+        {goal && summary.remainingSavings > 0 ? (
+          <Pressable onPress={handleGoalContribution} style={styles.goalContributionButton}>
+            <MaterialCommunityIcons name="target" color={colors.primary} size={21} />
+            <Text style={styles.goalContributionText}>حوّل الادخار للهدف</Text>
+          </Pressable>
+        ) : null}
+
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionDate}>{homePreviewData.todayLabel}</Text>
+          <Text style={styles.sectionDate}>{summary.isCurrentMonth ? `اليوم، ${formatDay(new Date())}` : "مصروفات الشهر"}</Text>
             <View style={styles.sectionTitleRow}>
               <Text style={styles.sectionTitle}>مصروفات اليوم</Text>
               <MaterialCommunityIcons name="calendar-outline" color={colors.primary} size={22} />
@@ -85,9 +153,13 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.expenseList}>
-            {homePreviewData.todayExpenses.map((expense) => (
-              <ExpenseRow key={expense.id} expense={expense} />
-            ))}
+            {latestExpenses.length > 0 ? (
+              latestExpenses.map((expense) => (
+                <ExpenseRow key={expense.id} expense={expense} />
+              ))
+            ) : (
+              <Text style={styles.emptyText}>مازال ما سجلتش مصاريف اليوم</Text>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -105,15 +177,68 @@ function MetricCard({ metric }: { metric: HomeMetricPreview }) {
   );
 }
 
-function ExpenseRow({ expense }: { expense: HomeExpensePreview }) {
+function BudgetStatusCard({ summary }: { summary: ReturnType<typeof calculateFinanceSummary> }) {
   return (
-    <Pressable style={styles.expenseRow}>
+    <View style={styles.budgetCard}>
+      <View style={styles.budgetHeader}>
+        <MaterialCommunityIcons name="chart-donut" color={colors.primary} size={25} />
+        <Text style={styles.budgetTitle}>متابعة الخطة</Text>
+      </View>
+
+      <BudgetRow label="مصاريف ثابتة" spent={summary.fixedSpent} budget={summary.fixedBudget} overrun={summary.fixedOverrun} />
+      <BudgetRow label="مصاريف زايدة" spent={summary.extraSpent} budget={summary.extraBudget} overrun={summary.extraOverrun} />
+
+      <View style={styles.transportSummary}>
+        <View style={styles.transportIcon}>
+          <MaterialCommunityIcons name="bus" color={colors.primary} size={22} />
+        </View>
+        <View style={styles.transportText}>
+          <Text style={styles.transportTitle}>{summary.isCurrentMonth ? "ترانسبور اليوم" : "ترانسبور الشهر"}</Text>
+          <Text style={styles.transportHint}>هذا الشهر: {formatMoney(summary.transportThisMonth)}</Text>
+        </View>
+        <Text style={styles.transportAmount}>{formatMoney(summary.todayTransport)}</Text>
+      </View>
+
+      {summary.savingsUsed > 0 ? (
+        <View style={styles.savingsWarning}>
+          <MaterialCommunityIcons name="alert-circle-outline" color={colors.coral} size={20} />
+          <Text style={styles.savingsWarningText}>استعملت من الادخار {formatMoney(summary.savingsUsed)}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function BudgetRow({ label, spent, budget, overrun }: { label: string; spent: number; budget: number; overrun: number }) {
+  const progress = budget > 0 ? Math.min(spent / budget, 1) : 0;
+  const color = overrun > 0 ? colors.coral : colors.primary;
+
+  return (
+    <View style={styles.budgetRow}>
+      <View style={styles.budgetRowText}>
+        <Text style={styles.budgetRowLabel}>{label}</Text>
+        <Text style={[styles.budgetRowAmount, { color }]}>
+          {formatMoney(spent)} / {formatMoney(budget)}
+        </Text>
+      </View>
+      <View style={styles.budgetTrack}>
+        <View style={[styles.budgetFill, { width: `${progress * 100}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
+function ExpenseRow({ expense }: { expense: ReturnType<typeof useSetup>["transactions"][number] }) {
+  const category = expenseCategories.find((item) => item.id === expense.category);
+
+  return (
+    <Pressable onPress={() => router.push({ pathname: "/expense/edit", params: { id: expense.id } })} style={styles.expenseRow}>
       <MaterialCommunityIcons name="chevron-left" color={colors.mutedText} size={24} />
       <Text style={styles.expenseAmount}>{formatMoney(expense.amount)}</Text>
       <View style={styles.expenseInfo}>
-        <Text style={styles.expenseTitle}>{expense.title}</Text>
-        <View style={[styles.expenseIcon, expense.tone === "coral" ? styles.expenseIconCoral : styles.expenseIconLavender]}>
-          <MaterialCommunityIcons name={expense.icon} color={expense.tone === "coral" ? colors.coral : colors.primary} size={24} />
+        <Text style={styles.expenseTitle}>{category?.label ?? "مصروف"}</Text>
+        <View style={[styles.expenseIcon, expense.isUnplanned ? styles.expenseIconCoral : styles.expenseIconLavender]}>
+          <MaterialCommunityIcons name={category?.icon ?? "cash"} color={expense.isUnplanned ? colors.coral : colors.primary} size={24} />
         </View>
       </View>
     </Pressable>
@@ -234,6 +359,13 @@ const styles = StyleSheet.create({
     lineHeight: 50,
     textAlign: "center"
   },
+  heroAdvance: {
+    marginTop: -2,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 12,
+    fontWeight: "800",
+    textAlign: "center"
+  },
   heroImage: {
     position: "absolute",
     right: 10,
@@ -273,6 +405,111 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     textAlign: "center"
   },
+  budgetCard: {
+    marginTop: 16,
+    borderRadius: 22,
+    padding: 18,
+    backgroundColor: colors.surface,
+    shadowColor: "#4B3B2D",
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2
+  },
+  budgetHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8
+  },
+  budgetTitle: {
+    color: colors.primary,
+    fontSize: 19,
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  budgetRow: {
+    marginTop: 14
+  },
+  budgetRowText: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  budgetRowLabel: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "800",
+    textAlign: "right"
+  },
+  budgetRowAmount: {
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  budgetTrack: {
+    height: 10,
+    marginTop: 7,
+    overflow: "hidden",
+    borderRadius: 5,
+    backgroundColor: "#F0EDEB"
+  },
+  budgetFill: {
+    height: "100%",
+    borderRadius: 5
+  },
+  transportSummary: {
+    minHeight: 54,
+    marginTop: 16,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 12
+  },
+  transportIcon: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: colors.lavender
+  },
+  transportText: {
+    flex: 1,
+    alignItems: "flex-end"
+  },
+  transportTitle: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  transportHint: {
+    marginTop: 2,
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right"
+  },
+  transportAmount: {
+    color: colors.primary,
+    fontSize: 19,
+    fontWeight: "900"
+  },
+  savingsWarning: {
+    marginTop: 12,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 6
+  },
+  savingsWarningText: {
+    color: colors.coral,
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "right"
+  },
   goalCard: {
     minHeight: 140,
     marginTop: 16,
@@ -287,6 +524,22 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 10 },
     elevation: 2
+  },
+  goalContributionButton: {
+    minHeight: 46,
+    marginTop: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    borderRadius: 16,
+    backgroundColor: colors.softGold
+  },
+  goalContributionText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "center"
   },
   goalIconWrap: {
     width: 88,
@@ -382,6 +635,12 @@ const styles = StyleSheet.create({
   expenseList: {
     gap: 12,
     marginTop: 16
+  },
+  emptyText: {
+    color: colors.mutedText,
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center"
   },
   expenseRow: {
     minHeight: 66,

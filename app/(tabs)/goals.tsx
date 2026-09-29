@@ -1,13 +1,30 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { MonthNavigator } from "@/components/MonthNavigator";
+import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
 
 const logoHeader = require("../../assets/images/logo-header.png");
 const phoneGoal = require("../../assets/images/phone-goal.png");
 const piggyGoal = require("../../assets/images/piggy-goal.png");
+
+type DisplayGoal = {
+  id: string;
+  title: string;
+  icon: "cellphone" | "shield-outline" | "target";
+  image: ImageSourcePropType;
+  target: number;
+  saved: number;
+  remaining?: number;
+  progress: number;
+  fill: string;
+  showRemaining: boolean;
+  estimate?: string;
+};
 
 const goals = [
   {
@@ -38,6 +55,26 @@ const goals = [
 ] as const;
 
 export default function GoalsScreen() {
+  const { goal, goals: savedGoals, goalSkipped } = useSetup();
+  const activeGoals = savedGoals.length > 0 ? savedGoals : goal ? [goal] : [];
+  const displayGoals: DisplayGoal[] = activeGoals.length > 0
+    ? activeGoals.map((item) => ({
+        id: item.id,
+        title: item.title,
+        icon: "target",
+        image: item.imageUri ? { uri: item.imageUri } : phoneGoal,
+        target: item.targetAmount,
+        saved: item.savedAmount,
+        remaining: Math.max(item.targetAmount - item.savedAmount, 0),
+        progress: Math.min(item.savedAmount / Math.max(item.targetAmount, 1), 1),
+        fill: colors.coral,
+        showRemaining: true,
+        estimate: item.targetDate ? `تقدير: ${item.targetDate}` : undefined
+      }))
+    : goalSkipped
+      ? []
+      : goals.map((item) => ({ ...item }));
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -53,11 +90,7 @@ export default function GoalsScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={22} />
-          <Text style={styles.monthText}>نوفمبر 2024</Text>
-          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
-        </Pressable>
+        <MonthNavigator />
 
         <View style={styles.titleSection}>
           <View style={styles.targetBadge}>
@@ -70,9 +103,16 @@ export default function GoalsScreen() {
         </View>
 
         <View style={styles.goalList}>
-          {goals.map((goal) => (
-            <GoalCard key={goal.id} goal={goal} />
-          ))}
+          {displayGoals.length > 0 ? (
+            displayGoals.map((item) => (
+              <GoalCard key={item.id} goal={item} />
+            ))
+          ) : (
+            <View style={styles.emptyGoalCard}>
+              <Text style={styles.emptyGoalTitle}>مازال ما عندكش هدف</Text>
+              <Text style={styles.emptyGoalText}>تنجم تزيد هدف وقت ما تحب وتتابع تقدّمك</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.impactNotice}>
@@ -88,7 +128,7 @@ export default function GoalsScreen() {
           </View>
         </View>
 
-        <Pressable style={styles.addButton}>
+        <Pressable onPress={() => router.push("/goal/add")} style={styles.addButton}>
           <Text style={styles.addText}>زيد هدف</Text>
           <View style={styles.addIcon}>
             <MaterialCommunityIcons name="plus" color={colors.primary} size={28} />
@@ -99,9 +139,12 @@ export default function GoalsScreen() {
   );
 }
 
-function GoalCard({ goal }: { goal: (typeof goals)[number] }) {
+function GoalCard({ goal }: { goal: DisplayGoal }) {
   return (
-    <Pressable style={styles.goalCard}>
+    <Pressable
+      onPress={() => router.push({ pathname: "/goal/[id]", params: { id: goal.id } })}
+      style={styles.goalCard}
+    >
       <View style={styles.goalImageWrap}>
         <Image source={goal.image} style={styles.goalImage} resizeMode="contain" />
         {goal.id === "phone" ? (
@@ -127,7 +170,7 @@ function GoalCard({ goal }: { goal: (typeof goals)[number] }) {
 
         <View style={goal.showRemaining ? styles.threeStats : styles.twoStats}>
           {goal.showRemaining ? (
-            <GoalStat label="المتبقي" value={formatMoney(goal.remaining)} valueColor="#C75A48" />
+            <GoalStat label="المتبقي" value={formatMoney(goal.remaining ?? Math.max(goal.target - goal.saved, 0))} valueColor="#C75A48" />
           ) : null}
           <GoalStat label="الموفر" value={formatMoney(goal.saved)} valueColor={goal.id === "phone" ? colors.success : colors.primary} />
           <GoalStat label="المستهدف" value={formatMoney(goal.target)} valueColor={colors.primary} />
@@ -242,6 +285,27 @@ const styles = StyleSheet.create({
   goalList: {
     gap: 14,
     marginTop: 20
+  },
+  emptyGoalCard: {
+    minHeight: 132,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    padding: 18,
+    backgroundColor: colors.surface
+  },
+  emptyGoalTitle: {
+    color: colors.primary,
+    fontSize: 20,
+    fontWeight: "900",
+    textAlign: "center"
+  },
+  emptyGoalText: {
+    marginTop: 8,
+    color: colors.mutedText,
+    fontSize: 15,
+    fontWeight: "700",
+    textAlign: "center"
   },
   goalCard: {
     minHeight: 178,

@@ -15,6 +15,8 @@ type SetupFlowScreenProps = {
   buttonLabel: string;
   onNext: () => void;
   children: ReactNode;
+  secondaryButtonLabel?: string;
+  onSecondary?: () => void;
 };
 
 export function SetupFlowScreen({
@@ -23,7 +25,9 @@ export function SetupFlowScreen({
   subtitle,
   buttonLabel,
   onNext,
-  children
+  children,
+  secondaryButtonLabel,
+  onSecondary
 }: SetupFlowScreenProps) {
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -51,9 +55,17 @@ export function SetupFlowScreen({
           {children}
         </ScrollView>
 
-        <Pressable onPress={onNext} style={styles.nextButton}>
-          <Text style={styles.nextText}>{buttonLabel}</Text>
-        </Pressable>
+        <View style={styles.footer}>
+          {secondaryButtonLabel && onSecondary ? (
+            <Pressable onPress={onSecondary} style={styles.secondaryButton}>
+              <Text style={styles.secondaryText}>{secondaryButtonLabel}</Text>
+            </Pressable>
+          ) : null}
+
+          <Pressable onPress={onNext} style={styles.nextButton}>
+            <Text style={styles.nextText}>{buttonLabel}</Text>
+          </Pressable>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -119,6 +131,24 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "800",
     lineHeight: 28,
+    textAlign: "center"
+  },
+  footer: {
+    gap: 10
+  },
+  secondaryButton: {
+    minHeight: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: colors.surface
+  },
+  secondaryText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: "900",
     textAlign: "center"
   },
   nextButton: {
