@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { MonthNavigator } from "@/components/MonthNavigator";
@@ -54,12 +54,14 @@ export default function EditMonthlyPlanScreen() {
   }
 
   async function handleSave() {
-    await setAllocations(
-      draftRows.map(({ amountText, ...row }) => ({
-        ...row,
-        amount: Number(amountText) || 0
-      }))
-    );
+    const nextAllocations = draftRows.map(({ amountText, ...row }) => ({
+      ...row,
+      amount: Number(amountText) || 0
+    }));
+    await setAllocations(nextAllocations);
+    if (total > income) {
+      Alert.alert("تنبيه", "هاي يا معلّم، نقّص شوية مصروف، راك خلّيتها شهر هاذي 😂");
+    }
     router.back();
   }
 

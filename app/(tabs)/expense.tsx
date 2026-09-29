@@ -1,18 +1,19 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories, type CategoryOption } from "@/constants/categories";
 import { MonthNavigator } from "@/components/MonthNavigator";
 import { useSetup } from "@/context/SetupContext";
+import { calculateFinanceSummary } from "@/services/financeService";
 import { colors } from "@/theme/colors";
 import type { ExpenseCategory } from "@/types/finance";
 import { formatDay, isSameMonth } from "@/utils/month";
 
 export default function ExpenseScreen() {
-  const { addTransaction, selectedMonth } = useSetup();
+  const { addTransaction, allocations, income, selectedMonth, transactions } = useSetup();
   const [amount, setAmount] = useState("25");
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>("transport");
   const [isUnplanned, setIsUnplanned] = useState(false);
@@ -32,6 +33,11 @@ export default function ExpenseScreen() {
       note: note.trim() || undefined,
       isUnplanned
     });
+
+    const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth);
+    if (summary.totalSpent + parsedAmount > income) {
+      Alert.alert("تنبيه", "هاي يا معلّم، نقّص شوية مصروف، راك خلّيتها شهر هاذي 😂");
+    }
 
     setAmount("");
     setNote("");
