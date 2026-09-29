@@ -3,12 +3,29 @@ import type { ComponentProps } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { expenseCategories } from "@/constants/categories";
+import { useSetup, type SetupTransaction } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
 
 const logoHeader = require("../../assets/images/logo-header.png");
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
+type AccountMetric = {
+  label: string;
+  amount: number;
+  icon: IconName;
+  tone: "green" | "coral" | "lavender";
+};
+
+type CategoryBreakdownItem = {
+  label: string;
+  amount: number;
+  percentage: number;
+  icon: IconName;
+  color: string;
+  backgroundColor: string;
+};
 
 const accountMetrics = [
   {
@@ -95,6 +112,47 @@ const categoryBreakdown = [
 ] as const;
 
 export default function AccountsScreen() {
+  const { income, transactions } = useSetup();
+  const spent = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const savings = Math.max(income - spent, 0);
+  const latestTransactions = transactions.slice(0, 3);
+  const accountMetrics: AccountMetric[] = [
+    {
+      label: "الدخل",
+      amount: income,
+      icon: "arrow-top-right",
+      tone: "green"
+    },
+    {
+      label: "المصروف",
+      amount: spent,
+      icon: "arrow-down",
+      tone: "coral"
+    },
+    {
+      label: "الادخار",
+      amount: savings,
+      icon: "piggy-bank-outline",
+      tone: "lavender"
+    }
+  ];
+  const categoryBreakdown: CategoryBreakdownItem[] = expenseCategories
+    .map((category, index) => {
+      const amount = transactions
+        .filter((transaction) => transaction.category === category.id)
+        .reduce((sum, transaction) => sum + transaction.amount, 0);
+
+      return {
+        label: category.label,
+        amount,
+        percentage: spent > 0 ? Math.round((amount / spent) * 100) : 0,
+        icon: category.icon,
+        color: index % 2 === 0 ? colors.coral : "#A994F5",
+        backgroundColor: index % 2 === 0 ? colors.softCoral : colors.lavender
+      };
+    })
+    .filter((category) => category.amount > 0);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -167,9 +225,13 @@ export default function AccountsScreen() {
           </View>
 
           <View style={styles.transactionsList}>
-            {transactions.map((transaction) => (
-              <TransactionRow key={transaction.id} transaction={transaction} />
-            ))}
+            {latestTransactions.length > 0 ? (
+              latestTransactions.map((transaction) => (
+                <TransactionRow key={transaction.id} transaction={transaction} />
+              ))
+            ) : (
+              <Text style={styles.emptyText}>ما فماش عمليات مسجلة</Text>
+            )}
           </View>
         </View>
 
@@ -187,9 +249,13 @@ export default function AccountsScreen() {
           </View>
 
           <View style={styles.categoryList}>
-            {categoryBreakdown.map((category) => (
-              <CategoryBreakdownRow key={category.label} category={category} />
-            ))}
+            {categoryBreakdown.length > 0 ? (
+              categoryBreakdown.map((category) => (
+                <CategoryBreakdownRow key={category.label} category={category} />
+              ))
+            ) : (
+              <Text style={styles.emptyText}>المصروف حسب الفئة يظهر بعد أول عملية</Text>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -197,7 +263,7 @@ export default function AccountsScreen() {
   );
 }
 
-function MetricCard({ metric }: { metric: (typeof accountMetrics)[number] }) {
+function MetricCard({ metric }: { metric: AccountMetric }) {
   const toneStyle = metricToneStyles[metric.tone];
   const iconColor = metricIconColors[metric.tone];
 
@@ -215,8 +281,10 @@ function MetricCard({ metric }: { metric: (typeof accountMetrics)[number] }) {
 function TransactionRow({
   transaction
 }: {
-  transaction: (typeof transactions)[number];
+  transaction: SetupTransaction;
 }) {
+  const category = expenseCategories.find((item) => item.id === transaction.category);
+
   return (
     <Pressable style={styles.transactionRow}>
       <MaterialCommunityIcons name="chevron-left" color={colors.primary} size={24} />
@@ -224,11 +292,11 @@ function TransactionRow({
 
       <View style={styles.transactionInfo}>
         <View style={styles.transactionText}>
-          <Text style={styles.transactionTitle}>{transaction.title}</Text>
-          <Text style={styles.transactionDate}>{transaction.date}</Text>
+          <Text style={styles.transactionTitle}>{category?.label ?? "مصروف"}</Text>
+          <Text style={styles.transactionDate}>{new Date(transaction.date).toLocaleDateString("ar-TN", { day: "numeric", month: "long" })}</Text>
         </View>
-        <View style={[styles.transactionIcon, { backgroundColor: transaction.backgroundColor }]}>
-          <MaterialCommunityIcons name={transaction.icon} color={transaction.iconColor} size={24} />
+        <View style={[styles.transactionIcon, { backgroundColor: transaction.isUnplanned ? colors.softCoral : colors.lavender }]}>
+          <MaterialCommunityIcons name={category?.icon ?? "cash"} color={transaction.isUnplanned ? colors.coral : colors.primary} size={24} />
         </View>
       </View>
     </Pressable>
@@ -238,7 +306,7 @@ function TransactionRow({
 function CategoryBreakdownRow({
   category
 }: {
-  category: (typeof categoryBreakdown)[number];
+  category: CategoryBreakdownItem;
 }) {
   return (
     <View style={styles.categoryRow}>
@@ -497,6 +565,13 @@ const styles = StyleSheet.create({
   },
   transactionsList: {
     marginTop: 2
+  },
+  emptyText: {
+    color: colors.mutedText,
+    fontSize: 15,
+    fontWeight: "800",
+    paddingVertical: 18,
+    textAlign: "center"
   },
   transactionRow: {
     minHeight: 66,

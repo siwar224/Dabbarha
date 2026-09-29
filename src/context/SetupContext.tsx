@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import type { ExpenseCategory } from "@/types/finance";
+
 export type SetupAllocation = {
   id: string;
   label: string;
@@ -16,11 +18,22 @@ export type SetupGoal = {
   targetDate?: string;
 };
 
+export type SetupTransaction = {
+  id: string;
+  amount: number;
+  category: ExpenseCategory;
+  date: string;
+  note?: string;
+  isUnplanned: boolean;
+  createdAt: string;
+};
+
 type SetupData = {
   income: number;
   allocations: SetupAllocation[];
   goal?: SetupGoal;
   goalSkipped: boolean;
+  transactions: SetupTransaction[];
 };
 
 type SetupContextValue = SetupData & {
@@ -29,6 +42,7 @@ type SetupContextValue = SetupData & {
   setAllocations: (allocations: SetupAllocation[]) => Promise<void>;
   setGoal: (goal: SetupGoal) => Promise<void>;
   skipGoal: () => Promise<void>;
+  addTransaction: (transaction: Omit<SetupTransaction, "id" | "createdAt">) => Promise<void>;
 };
 
 const STORAGE_KEY = "dabbirha.setup.v1";
@@ -58,7 +72,8 @@ const defaultSetupData: SetupData = {
       tone: "blue"
     }
   ],
-  goalSkipped: false
+  goalSkipped: false,
+  transactions: []
 };
 
 const SetupContext = createContext<SetupContextValue | undefined>(undefined);
@@ -72,7 +87,12 @@ export function SetupProvider({ children }: { children: ReactNode }) {
       try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
         if (stored) {
-          setData({ ...defaultSetupData, ...JSON.parse(stored) });
+          const parsed = JSON.parse(stored);
+          setData({
+            ...defaultSetupData,
+            ...parsed,
+            transactions: parsed.transactions ?? []
+          });
         }
       } finally {
         setIsLoaded(true);
@@ -102,6 +122,19 @@ export function SetupProvider({ children }: { children: ReactNode }) {
       },
       skipGoal: async () => {
         await updateData({ ...data, goal: undefined, goalSkipped: true });
+      },
+      addTransaction: async (transaction) => {
+        await updateData({
+          ...data,
+          transactions: [
+            {
+              ...transaction,
+              id: `${Date.now()}`,
+              createdAt: new Date().toISOString()
+            },
+            ...data.transactions
+          ]
+        });
       }
     }),
     [data, isLoaded, updateData]

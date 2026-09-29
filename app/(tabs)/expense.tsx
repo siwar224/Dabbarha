@@ -1,18 +1,45 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories, type CategoryOption } from "@/constants/categories";
+import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import type { ExpenseCategory } from "@/types/finance";
+import { formatMoney } from "@/utils/formatMoney";
 
 const logoHeader = require("../../assets/images/logo-header.png");
 
 export default function ExpenseScreen() {
-  const [amount, setAmount] = useState("25");
+  const { allocations, addTransaction } = useSetup();
+  const [amount, setAmount] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>("transport");
   const [isUnplanned, setIsUnplanned] = useState(true);
+  const [note, setNote] = useState("");
+
+  const savingsTarget = allocations.find((item) => item.id === "saving")?.amount ?? 0;
+  const nextMonthRequired = savingsTarget + (Number(amount) || 0);
+
+  async function handleSubmit() {
+    const parsedAmount = Number(amount);
+    if (!parsedAmount) {
+      return;
+    }
+
+    await addTransaction({
+      amount: parsedAmount,
+      category: selectedCategory,
+      date: new Date().toISOString(),
+      note: note.trim() || undefined,
+      isUnplanned
+    });
+
+    setAmount("");
+    setNote("");
+    router.replace("/(tabs)");
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -72,6 +99,8 @@ export default function ExpenseScreen() {
           <Text style={styles.noteTitle}>ملاحظة (اختياري)</Text>
           <TextInput
             style={styles.noteInput}
+            value={note}
+            onChangeText={setNote}
             placeholder="مثلا: تاكسي للجامعة"
             placeholderTextColor={colors.mutedText}
             textAlign="right"
@@ -93,11 +122,11 @@ export default function ExpenseScreen() {
           </View>
           <Text style={styles.impactText}>
             إذا تسجل هذا المصروف، الشهر الجاي يلزمك توفّر{" "}
-            <Text style={styles.impactAmount}>525 د</Text> باش تبقى في نفس الهدف.
+            <Text style={styles.impactAmount}>{formatMoney(nextMonthRequired)}</Text> باش تبقى في نفس الهدف.
           </Text>
         </View>
 
-        <Pressable style={styles.submitButton}>
+        <Pressable onPress={handleSubmit} style={styles.submitButton}>
           <Text style={styles.submitText}>سجّل المصروف</Text>
         </Pressable>
       </ScrollView>

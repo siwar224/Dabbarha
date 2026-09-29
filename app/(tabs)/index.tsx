@@ -3,7 +3,8 @@ import { router } from "expo-router";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { homePreviewData, type HomeExpensePreview, type HomeMetricPreview } from "@/constants/homePreviewData";
+import { expenseCategories } from "@/constants/categories";
+import { homePreviewData, type HomeMetricPreview } from "@/constants/homePreviewData";
 import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
@@ -12,8 +13,39 @@ const logoHeader = require("../../assets/images/logo-header.png");
 const walletHero = require("../../assets/images/wallet-hero-transparent.png");
 
 export default function HomeScreen() {
-  const goal = homePreviewData.primaryGoal;
-  const { income } = useSetup();
+  const { income, allocations, goal, transactions } = useSetup();
+  const spent = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const saved = Math.max(income - spent, 0);
+  const savingsTarget = allocations.find((item) => item.id === "saving")?.amount ?? 0;
+  const remaining = Math.max(income - spent - savingsTarget, 0);
+  const activeGoal = goal ?? {
+    title: "هدفي: تليفون",
+    targetAmount: 950,
+    savedAmount: 300
+  };
+  const goalProgress = Math.min(activeGoal.savedAmount / Math.max(activeGoal.targetAmount, 1), 1);
+  const latestExpenses = transactions.slice(0, 3);
+
+  const metrics: HomeMetricPreview[] = [
+    {
+      label: "صرفت",
+      amount: spent,
+      icon: "chart-bar",
+      tone: "coral"
+    },
+    {
+      label: "وفّرت",
+      amount: saved,
+      icon: "piggy-bank-outline",
+      tone: "gold"
+    },
+    {
+      label: "باقيلي",
+      amount: remaining,
+      icon: "clock-outline",
+      tone: "lavender"
+    }
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -53,7 +85,7 @@ export default function HomeScreen() {
         </Pressable>
 
         <View style={styles.metricsRow}>
-          {homePreviewData.metrics.map((metric) => (
+          {metrics.map((metric) => (
             <MetricCard key={metric.label} metric={metric} />
           ))}
         </View>
@@ -69,15 +101,15 @@ export default function HomeScreen() {
               <View style={styles.goalBadge}>
                 <MaterialCommunityIcons name="cellphone" color={colors.primary} size={22} />
               </View>
-              <Text style={styles.goalTitle}>{goal.title}</Text>
+              <Text style={styles.goalTitle}>هدفي: {activeGoal.title}</Text>
             </View>
             <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${goal.progress * 100}%` }]} />
+              <View style={[styles.progressFill, { width: `${goalProgress * 100}%` }]} />
             </View>
             <View style={styles.goalNumbers}>
-              <Text style={styles.goalNumber}>{formatMoney(goal.remainingAmount)} باقي</Text>
+              <Text style={styles.goalNumber}>{formatMoney(Math.max(activeGoal.targetAmount - activeGoal.savedAmount, 0))} باقي</Text>
               <Text style={styles.goalNumber}>
-                {goal.savedAmount} / {formatMoney(goal.targetAmount)}
+                {formatMoney(activeGoal.savedAmount)} / {formatMoney(activeGoal.targetAmount)}
               </Text>
             </View>
           </View>
@@ -93,9 +125,13 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.expenseList}>
-            {homePreviewData.todayExpenses.map((expense) => (
-              <ExpenseRow key={expense.id} expense={expense} />
-            ))}
+            {latestExpenses.length > 0 ? (
+              latestExpenses.map((expense) => (
+                <ExpenseRow key={expense.id} expense={expense} />
+              ))
+            ) : (
+              <Text style={styles.emptyText}>مازال ما سجلتش مصاريف اليوم</Text>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -113,15 +149,17 @@ function MetricCard({ metric }: { metric: HomeMetricPreview }) {
   );
 }
 
-function ExpenseRow({ expense }: { expense: HomeExpensePreview }) {
+function ExpenseRow({ expense }: { expense: ReturnType<typeof useSetup>["transactions"][number] }) {
+  const category = expenseCategories.find((item) => item.id === expense.category);
+
   return (
     <Pressable style={styles.expenseRow}>
       <MaterialCommunityIcons name="chevron-left" color={colors.mutedText} size={24} />
       <Text style={styles.expenseAmount}>{formatMoney(expense.amount)}</Text>
       <View style={styles.expenseInfo}>
-        <Text style={styles.expenseTitle}>{expense.title}</Text>
-        <View style={[styles.expenseIcon, expense.tone === "coral" ? styles.expenseIconCoral : styles.expenseIconLavender]}>
-          <MaterialCommunityIcons name={expense.icon} color={expense.tone === "coral" ? colors.coral : colors.primary} size={24} />
+        <Text style={styles.expenseTitle}>{category?.label ?? "مصروف"}</Text>
+        <View style={[styles.expenseIcon, expense.isUnplanned ? styles.expenseIconCoral : styles.expenseIconLavender]}>
+          <MaterialCommunityIcons name={category?.icon ?? "cash"} color={expense.isUnplanned ? colors.coral : colors.primary} size={24} />
         </View>
       </View>
     </Pressable>
@@ -390,6 +428,12 @@ const styles = StyleSheet.create({
   expenseList: {
     gap: 12,
     marginTop: 16
+  },
+  emptyText: {
+    color: colors.mutedText,
+    fontSize: 16,
+    fontWeight: "800",
+    textAlign: "center"
   },
   expenseRow: {
     minHeight: 66,
