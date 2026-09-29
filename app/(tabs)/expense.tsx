@@ -26,16 +26,28 @@ export default function ExpenseScreen() {
       return;
     }
 
-    await addTransaction({
+    const expense = {
       amount: parsedAmount,
       category: selectedCategory,
       date: expenseDate.toISOString(),
       note: note.trim() || undefined,
       isUnplanned
-    });
+    };
+    const projectedTransactions = [
+      {
+        ...expense,
+        id: "pending-expense",
+        createdAt: new Date().toISOString()
+      },
+      ...transactions
+    ];
+    const projectedSummary = calculateFinanceSummary(income, allocations, projectedTransactions, selectedMonth);
 
-    const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth);
-    if (summary.totalSpent + parsedAmount > income) {
+    await addTransaction(expense);
+
+    if (projectedSummary.fixedOverrun > 0 || projectedSummary.extraOverrun > 0) {
+      Alert.alert("تنبيه", "دخلنا في الطبعة");
+    } else if (projectedSummary.totalSpent > income) {
       Alert.alert("تنبيه", "هاي يا معلّم، نقّص شوية مصروف، راك خلّيتها شهر هاذي 😂");
     }
 
