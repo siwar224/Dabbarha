@@ -6,12 +6,14 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { MonthNavigator } from "@/components/MonthNavigator";
-import { useSetup, type SetupAllocation } from "@/context/SetupContext";
+import { expenseCategories } from "@/constants/categories";
+import { useSetup, type SetupAllocation, type SetupCategoryBudget } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 type DraftAllocation = SetupAllocation & { amountText: string };
+type DraftCategoryBudget = SetupCategoryBudget & { amountText: string };
 
 const toneStyles = {
   coral: {
@@ -33,18 +35,26 @@ const toneStyles = {
 } as const;
 
 export default function EditMonthlyPlanScreen() {
-  const { income, allocations, setAllocations } = useSetup();
+  const { income, allocations, categoryBudgets, setMonthlyPlan } = useSetup();
   const [draftRows, setDraftRows] = useState<DraftAllocation[]>(() =>
     allocations.map((row) => ({ ...row, amountText: String(row.amount) }))
+  );
+  const [draftCategoryBudgets, setDraftCategoryBudgets] = useState<DraftCategoryBudget[]>(() =>
+    categoryBudgets.map((budget) => ({ ...budget, amountText: String(budget.amount) }))
   );
 
   useEffect(() => {
     setDraftRows(allocations.map((row) => ({ ...row, amountText: String(row.amount) })));
-  }, [allocations]);
+    setDraftCategoryBudgets(categoryBudgets.map((budget) => ({ ...budget, amountText: String(budget.amount) })));
+  }, [allocations, categoryBudgets]);
 
   const total = useMemo(
     () => draftRows.reduce((sum, row) => sum + (Number(row.amountText) || 0), 0),
     [draftRows]
+  );
+  const categoryTotal = useMemo(
+    () => draftCategoryBudgets.reduce((sum, budget) => sum + (Number(budget.amountText) || 0), 0),
+    [draftCategoryBudgets]
   );
 
   function updateRowAmount(rowId: string, amountText: string) {
@@ -53,12 +63,34 @@ export default function EditMonthlyPlanScreen() {
     );
   }
 
+  function updateCategoryBudget(category: SetupCategoryBudget["category"], amountText: string) {
+    setDraftCategoryBudgets((currentBudgets) =>
+      currentBudgets.map((budget) => (budget.category === category ? { ...budget, amountText } : budget))
+    );
+  }
+
   async function handleSave() {
     const nextAllocations = draftRows.map(({ amountText, ...row }) => ({
       ...row,
       amount: Number(amountText) || 0
     }));
-    await setAllocations(nextAllocations);
+    const nextCategoryBudgets = draftCategoryBudgets.map(({ amountText, ...budget }) => ({
+      ...budget,
+      amount: Number(amountText) || 0
+    }));
+    if (nextAllocations.some((row) => row.amount < 0) || nextCategoryBudgets.some((budget) => budget.amount < 0)) {
+      Alert.alert("تنبيه", "المبالغ ما تنجمش تكون سالبة");
+      return;
+    }
+    const envelopeTotal = nextAllocations
+      .filter((row) => row.id !== "saving")
+      .reduce((sum, row) => sum + row.amount, 0);
+    const nextCategoryTotal = nextCategoryBudgets.reduce((sum, budget) => sum + budget.amount, 0);
+    if (nextCategoryTotal !== envelopeTotal) {
+      Alert.alert("تنبيه", "مجموع ميزانيات الفئات لازم يساوي مصاريف ثابتة ومصاريف زايدة");
+      return;
+    }
+    await setMonthlyPlan({ allocations: nextAllocations, categoryBudgets: nextCategoryBudgets });
     if (total > income) {
       Alert.alert("تنبيه", "هاي يا معلّم، نقّص شوية مصروف، راك خلّيتها شهر هاذي 😂");
     }
@@ -119,6 +151,41 @@ export default function EditMonthlyPlanScreen() {
               />
             </View>
           </View>
+        </View>
+
+        <View style={styles.categoryBudgetCard}>
+          <View style={styles.categoryBudgetHeader}>
+            <Text style={styles.categoryBudgetTitle}>ميزانية حسب الفئة</Text>
+            <MaterialCommunityIcons name="tag-multiple-outline" color={colors.primary} size={25} />
+          </View>
+          <Text style={styles.categoryBudgetHint}>وزّع مصاريف ثابتة ومصاريف زايدة على الفئات</Text>
+
+          <View style={styles.categoryBudgetList}>
+            {draftCategoryBudgets.map((budget) => {
+              const category = expenseCategories.find((item) => item.id === budget.category);
+              return (
+                <View key={budget.category} style={styles.categoryBudgetRow}>
+                  <View style={styles.categoryAmountWrap}>
+                    <Text style={styles.currency}>د</Text>
+                    <TextInput
+                      value={budget.amountText}
+                      onChangeText={(value) => updateCategoryBudget(budget.category, value)}
+                      keyboardType="numeric"
+                      style={styles.categoryAmountInput}
+                      textAlign="left"
+                      placeholder="0"
+                      placeholderTextColor={colors.mutedText}
+                    />
+                  </View>
+                  <View style={styles.categoryLabelWrap}>
+                    <Text style={styles.categoryLabel}>{category?.label ?? budget.category}</Text>
+                    <MaterialCommunityIcons name={category?.icon ?? "cash"} color={colors.primary} size={22} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          <Text style={styles.categoryBudgetTotal}>المجموع: {formatMoney(categoryTotal)}</Text>
         </View>
 
         <Pressable onPress={handleSave} style={styles.saveButton}>
@@ -248,6 +315,79 @@ const styles = StyleSheet.create({
   totalLabel: {
     color: colors.primary,
     fontSize: 17,
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  categoryBudgetCard: {
+    marginTop: 16,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: colors.surface,
+    shadowColor: "#4B3B2D",
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 2
+  },
+  categoryBudgetHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8
+  },
+  categoryBudgetTitle: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  categoryBudgetHint: {
+    marginTop: 4,
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right"
+  },
+  categoryBudgetList: {
+    gap: 8,
+    marginTop: 12
+  },
+  categoryBudgetRow: {
+    minHeight: 48,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    backgroundColor: "#FBFAF8"
+  },
+  categoryAmountWrap: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5
+  },
+  categoryAmountInput: {
+    minWidth: 50,
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: "900",
+    padding: 0
+  },
+  categoryLabelWrap: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
+  categoryLabel: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "800",
+    textAlign: "right"
+  },
+  categoryBudgetTotal: {
+    marginTop: 10,
+    color: colors.primary,
+    fontSize: 15,
     fontWeight: "900",
     textAlign: "right"
   },

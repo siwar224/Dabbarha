@@ -1,11 +1,12 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories, type CategoryOption } from "@/constants/categories";
 import { MonthNavigator } from "@/components/MonthNavigator";
+import { DatePickerModal } from "@/components/DatePickerModal";
 import { useSetup } from "@/context/SetupContext";
 import { calculateFinanceSummary } from "@/services/financeService";
 import { colors } from "@/theme/colors";
@@ -13,16 +14,29 @@ import type { ExpenseCategory } from "@/types/finance";
 import { formatDay, isSameMonth } from "@/utils/month";
 
 export default function ExpenseScreen() {
-  const { addTransaction, allocations, income, selectedMonth, transactions } = useSetup();
+  const { addRecurringExpense, addTransaction, allocations, categoryBudgets, income, selectedMonth, transactions } = useSetup();
   const [amount, setAmount] = useState("25");
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>("transport");
   const [isUnplanned, setIsUnplanned] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [intervalDays, setIntervalDays] = useState("1");
   const [note, setNote] = useState("");
-  const expenseDate = isSameMonth(selectedMonth, new Date()) ? new Date() : selectedMonth;
+  const [expenseDate, setExpenseDate] = useState(() => isSameMonth(selectedMonth, new Date()) ? new Date() : selectedMonth);
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+
+  useEffect(() => {
+    setExpenseDate(isSameMonth(selectedMonth, new Date()) ? new Date() : selectedMonth);
+  }, [selectedMonth]);
 
   async function handleSubmit() {
     const parsedAmount = Number(amount);
-    if (!parsedAmount) {
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      Alert.alert("تنبيه", "المبلغ لازم يكون أكبر من صفر");
+      return;
+    }
+    const parsedInterval = Number(intervalDays);
+    if (isRecurring && (!Number.isInteger(parsedInterval) || parsedInterval <= 0)) {
+      Alert.alert("تنبيه", "عدد أيام التكرار لازم يكون أكبر من صفر");
       return;
     }
 
@@ -41,9 +55,20 @@ export default function ExpenseScreen() {
       },
       ...transactions
     ];
-    const projectedSummary = calculateFinanceSummary(income, allocations, projectedTransactions, selectedMonth);
+    const projectedSummary = calculateFinanceSummary(income, allocations, projectedTransactions, selectedMonth, categoryBudgets);
 
     await addTransaction(expense);
+    if (isRecurring) {
+      const nextDate = new Date(expenseDate);
+      nextDate.setDate(nextDate.getDate() + parsedInterval);
+      await addRecurringExpense({
+        amount: parsedAmount,
+        category: selectedCategory,
+        note: note.trim() || undefined,
+        intervalDays: parsedInterval,
+        nextDate: nextDate.toISOString()
+      });
+    }
 
     if (projectedSummary.fixedOverrun > 0 || projectedSummary.extraOverrun > 0) {
       Alert.alert("تنبيه", "دخلنا في الطبعة");
@@ -95,7 +120,7 @@ export default function ExpenseScreen() {
           ))}
         </View>
 
-        <Pressable style={styles.dateRow}>
+        <Pressable onPress={() => setDatePickerVisible(true)} style={styles.dateRow}>
           <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={23} />
           <Text style={styles.dateValue}>{formatDay(expenseDate)}</Text>
           <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={24} />
@@ -121,10 +146,30 @@ export default function ExpenseScreen() {
           />
         </View>
 
+        <View style={styles.recurringCard}>
+          <SwitchPreview isOn={isRecurring} onPress={() => setIsRecurring((value) => !value)} />
+          <View style={styles.recurringTextWrap}>
+            <Text style={styles.switchLabel}>كرّر المصروف تلقائيًا</Text>
+            <Text style={styles.recurringHint}>مفيد للنقل اليومي</Text>
+          </View>
+          {isRecurring ? (
+            <View style={styles.intervalWrap}>
+              <TextInput value={intervalDays} onChangeText={setIntervalDays} keyboardType="numeric" style={styles.intervalInput} />
+              <Text style={styles.intervalLabel}>يوم</Text>
+            </View>
+          ) : null}
+        </View>
+
         <Pressable onPress={handleSubmit} style={styles.submitButton}>
           <Text style={styles.submitText}>سجّل المصروف</Text>
         </Pressable>
       </ScrollView>
+      <DatePickerModal
+        visible={isDatePickerVisible}
+        value={expenseDate}
+        onChange={setExpenseDate}
+        onClose={() => setDatePickerVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -354,6 +399,50 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     padding: 0,
     textAlign: "right"
+  },
+  recurringCard: {
+    minHeight: 62,
+    marginTop: 10,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    backgroundColor: colors.surface
+  },
+  recurringTextWrap: {
+    flex: 1,
+    alignItems: "flex-end"
+  },
+  recurringHint: {
+    marginTop: 2,
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right"
+  },
+  intervalWrap: {
+    width: 72,
+    height: 38,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 4,
+    borderRadius: 10,
+    backgroundColor: colors.softBlue
+  },
+  intervalInput: {
+    minWidth: 24,
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "900",
+    padding: 0,
+    textAlign: "center"
+  },
+  intervalLabel: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "800"
   },
   submitButton: {
     minHeight: 56,

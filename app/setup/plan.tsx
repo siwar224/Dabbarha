@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { SetupFlowScreen } from "@/components/SetupFlowScreen";
 import { useSetup, type SetupAllocation } from "@/context/SetupContext";
@@ -39,7 +39,7 @@ const newAllocationDefaults: SetupAllocation = {
 };
 
 export default function PlanSetupScreen() {
-  const { income, allocations, setAllocations } = useSetup();
+  const { income, allocations, categoryBudgets, setMonthlyPlan } = useSetup();
   const [draftRows, setDraftRows] = useState<SetupAllocation[]>(allocations);
   const [editingRow, setEditingRow] = useState<SetupAllocation | null>(null);
 
@@ -53,7 +53,27 @@ export default function PlanSetupScreen() {
   );
 
   async function handleNext() {
-    await setAllocations(draftRows);
+    if (draftRows.some((row) => row.amount < 0)) {
+      Alert.alert("تنبيه", "المبالغ ما تنجمش تكون سالبة");
+      return;
+    }
+    const fixedAmount = draftRows.find((row) => row.id === "fixed")?.amount ?? 0;
+    const extraAmount = draftRows.find((row) => row.id === "extra")?.amount ?? 0;
+    const variableBudgets = categoryBudgets.filter((budget) => budget.category !== "transport");
+    const variableTotal = variableBudgets.reduce((sum, budget) => sum + budget.amount, 0) || 1;
+    const adjustedVariableBudgets = variableBudgets.map((budget, index) => ({
+      ...budget,
+      amount: index === variableBudgets.length - 1
+        ? Math.max(extraAmount - variableBudgets.slice(0, -1).reduce((sum, item) => sum + Math.round((item.amount / variableTotal) * extraAmount), 0), 0)
+        : Math.max(Math.round((budget.amount / variableTotal) * extraAmount), 0)
+    }));
+    await setMonthlyPlan({
+      allocations: draftRows,
+      categoryBudgets: [{ category: "transport", amount: fixedAmount }, ...adjustedVariableBudgets]
+    });
+    if (total > income) {
+      Alert.alert("تنبيه", "هاي يا معلّم، نقّص شوية مصروف، راك خلّيتها شهر هاذي 😂");
+    }
     router.push("/setup/goal");
   }
 

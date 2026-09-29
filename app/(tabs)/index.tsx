@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import type { ComponentProps } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories } from "@/constants/categories";
@@ -23,8 +23,8 @@ type HomeMetricPreview = {
 };
 
 export default function HomeScreen() {
-  const { income, advance, allocations, goal, transactions, selectedMonth } = useSetup();
-  const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth);
+  const { addGoalContribution, income, advance, allocations, categoryBudgets, goal, transactions, selectedMonth } = useSetup();
+  const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth, categoryBudgets);
   const activeGoal = goal ?? {
     title: "هدفي: تليفون",
     targetAmount: 950,
@@ -32,6 +32,21 @@ export default function HomeScreen() {
   };
   const goalProgress = Math.min(activeGoal.savedAmount / Math.max(activeGoal.targetAmount, 1), 1);
   const latestExpenses = summary.monthTransactions.slice(0, 3);
+
+  function handleGoalContribution() {
+    if (!goal || summary.remainingSavings <= 0) {
+      return;
+    }
+    Alert.alert("إضافة للهدف", `تحب تضيف ${formatMoney(summary.remainingSavings)} لهدفك؟`, [
+      { text: "إلغاء", style: "cancel" },
+      {
+        text: "إضافة",
+        onPress: async () => {
+          await addGoalContribution(summary.remainingSavings);
+        }
+      }
+    ]);
+  }
 
   const metrics: HomeMetricPreview[] = [
     {
@@ -120,6 +135,13 @@ export default function HomeScreen() {
             </View>
           </View>
         </Pressable>
+
+        {goal && summary.remainingSavings > 0 ? (
+          <Pressable onPress={handleGoalContribution} style={styles.goalContributionButton}>
+            <MaterialCommunityIcons name="target" color={colors.primary} size={21} />
+            <Text style={styles.goalContributionText}>حوّل الادخار للهدف</Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
@@ -210,7 +232,7 @@ function ExpenseRow({ expense }: { expense: ReturnType<typeof useSetup>["transac
   const category = expenseCategories.find((item) => item.id === expense.category);
 
   return (
-    <Pressable style={styles.expenseRow}>
+    <Pressable onPress={() => router.push({ pathname: "/expense/edit", params: { id: expense.id } })} style={styles.expenseRow}>
       <MaterialCommunityIcons name="chevron-left" color={colors.mutedText} size={24} />
       <Text style={styles.expenseAmount}>{formatMoney(expense.amount)}</Text>
       <View style={styles.expenseInfo}>
@@ -502,6 +524,22 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 10 },
     elevation: 2
+  },
+  goalContributionButton: {
+    minHeight: 46,
+    marginTop: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    borderRadius: 16,
+    backgroundColor: colors.softGold
+  },
+  goalContributionText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "center"
   },
   goalIconWrap: {
     width: 88,

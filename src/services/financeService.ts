@@ -1,10 +1,12 @@
-import type { SetupAllocation, SetupTransaction } from "@/types/setup";
+import type { SetupAllocation, SetupCategoryBudget, SetupTransaction } from "@/types/setup";
 
 export type BudgetBucket = "fixed" | "extra";
 
 export type FinanceSummary = {
   monthTransactions: SetupTransaction[];
   categoryTotals: Record<SetupTransaction["category"], number>;
+  categoryBudgets: Record<SetupTransaction["category"], number>;
+  categoryOverruns: Record<SetupTransaction["category"], number>;
   totalSpent: number;
   fixedBudget: number;
   extraBudget: number;
@@ -45,13 +47,17 @@ export function calculateFinanceSummary(
   income: number,
   allocations: SetupAllocation[],
   transactions: SetupTransaction[],
-  referenceDate = new Date()
+  referenceDate = new Date(),
+  categoryBudgets: SetupCategoryBudget[] = []
 ): FinanceSummary {
   const isCurrentMonth = getMonthKey(referenceDate) === getMonthKey(new Date());
   const monthTransactions = transactions.filter(
     (transaction) => getMonthKey(transaction.date) === getMonthKey(referenceDate)
   );
   const categoryTotals = Object.fromEntries(expenseCategories.map((category) => [category, 0])) as FinanceSummary["categoryTotals"];
+  const categoryBudgetTotals = Object.fromEntries(
+    expenseCategories.map((category) => [category, categoryBudgets.find((budget) => budget.category === category)?.amount ?? 0])
+  ) as FinanceSummary["categoryBudgets"];
 
   for (const transaction of monthTransactions) {
     categoryTotals[transaction.category] += transaction.amount;
@@ -72,7 +78,21 @@ export function calculateFinanceSummary(
     .reduce((sum, transaction) => sum + transaction.amount, 0);
   const fixedOverrun = Math.max(fixedSpent - fixedBudget, 0);
   const extraOverrun = Math.max(extraSpent - extraBudget, 0);
-  const savingsUsed = unplannedSpent + fixedOverrun + extraOverrun;
+  const categoryOverruns = Object.fromEntries(
+    expenseCategories.map((category) => {
+      const spent = plannedTransactions
+        .filter((transaction) => transaction.category === category)
+        .reduce((sum, transaction) => sum + transaction.amount, 0);
+      return [category, categoryBudgetTotals[category] > 0 ? Math.max(spent - categoryBudgetTotals[category], 0) : 0];
+    })
+  ) as FinanceSummary["categoryOverruns"];
+  const preciseFixedOverrun = categoryBudgets.length > 0 ? categoryOverruns.transport : fixedOverrun;
+  const preciseExtraOverrun = categoryBudgets.length > 0
+    ? expenseCategories
+        .filter((category) => category !== "transport")
+        .reduce((sum, category) => sum + categoryOverruns[category], 0)
+    : extraOverrun;
+  const savingsUsed = unplannedSpent + preciseFixedOverrun + preciseExtraOverrun;
   const transportDay = isCurrentMonth ? new Date() : referenceDate;
   const todayTransport = monthTransactions
     .filter(
@@ -84,6 +104,8 @@ export function calculateFinanceSummary(
   return {
     monthTransactions,
     categoryTotals,
+    categoryBudgets: categoryBudgetTotals,
+    categoryOverruns,
     totalSpent: monthTransactions.reduce((sum, transaction) => sum + transaction.amount, 0),
     fixedBudget,
     extraBudget,
@@ -92,8 +114,8 @@ export function calculateFinanceSummary(
     extraSpent,
     fixedRemaining: Math.max(fixedBudget - fixedSpent, 0),
     extraRemaining: Math.max(extraBudget - extraSpent, 0),
-    fixedOverrun,
-    extraOverrun,
+    fixedOverrun: preciseFixedOverrun,
+    extraOverrun: preciseExtraOverrun,
     unplannedSpent,
     savingsUsed,
     remainingSavings: Math.max(savingsBudget - savingsUsed, 0),

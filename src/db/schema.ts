@@ -88,5 +88,37 @@ export const migrations = [
     sortOrder INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (month, year, id)
   );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS monthly_category_budgets (
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    amount REAL NOT NULL,
+    PRIMARY KEY (month, year, category)
+  );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS income_entries (
+    id TEXT PRIMARY KEY NOT NULL,
+    monthKey TEXT NOT NULL,
+    type TEXT NOT NULL,
+    amount REAL NOT NULL,
+    date TEXT NOT NULL,
+    note TEXT,
+    createdAt TEXT NOT NULL
+  );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS recurring_expenses (
+    id TEXT PRIMARY KEY NOT NULL,
+    amount REAL NOT NULL,
+    category TEXT NOT NULL,
+    note TEXT,
+    intervalDays INTEGER NOT NULL,
+    nextDate TEXT NOT NULL,
+    endDate TEXT,
+    createdAt TEXT NOT NULL
+  );
   `
 ] as const;

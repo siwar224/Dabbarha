@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
+import { router } from "expo-router";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -31,8 +32,8 @@ type CategoryBreakdownItem = {
 };
 
 export default function AccountsScreen() {
-  const { income, allocations, transactions, selectedMonth } = useSetup();
-  const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth);
+  const { income, allocations, categoryBudgets, transactions, selectedMonth } = useSetup();
+  const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth, categoryBudgets);
   const spent = summary.totalSpent;
   const savings = summary.remainingSavings;
   const latestTransactions = summary.monthTransactions.slice(0, 3);
@@ -215,7 +216,7 @@ function TransactionRow({
   const category = expenseCategories.find((item) => item.id === transaction.category);
 
   return (
-    <Pressable style={styles.transactionRow}>
+    <Pressable onPress={() => router.push({ pathname: "/expense/edit", params: { id: transaction.id } })} style={styles.transactionRow}>
       <MaterialCommunityIcons name="chevron-left" color={colors.primary} size={24} />
       <Text style={styles.transactionAmount}>{formatMoney(transaction.amount)}</Text>
 

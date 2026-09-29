@@ -29,18 +29,48 @@ export type SetupTransaction = {
   createdAt: string;
 };
 
+export type SetupIncomeEntry = {
+  id: string;
+  monthKey: string;
+  type: "salary" | "advance";
+  amount: number;
+  date: string;
+  note?: string;
+  createdAt: string;
+};
+
+export type SetupCategoryBudget = {
+  category: ExpenseCategory;
+  amount: number;
+};
+
+export type SetupRecurringExpense = {
+  id: string;
+  amount: number;
+  category: ExpenseCategory;
+  note?: string;
+  intervalDays: number;
+  nextDate: string;
+  endDate?: string;
+  createdAt: string;
+};
+
 export type SetupMonthlyPlan = {
   monthKey: string;
   income: number;
   advance: number;
   allocations: SetupAllocation[];
+  categoryBudgets: SetupCategoryBudget[];
 };
 
 export type SetupData = {
   income: number;
   advance: number;
   allocations: SetupAllocation[];
+  categoryBudgets: SetupCategoryBudget[];
   monthlyPlans: SetupMonthlyPlan[];
+  incomeEntries: SetupIncomeEntry[];
+  recurringExpenses: SetupRecurringExpense[];
   goal?: SetupGoal;
   goals: SetupGoal[];
   goalSkipped: boolean;

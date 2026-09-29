@@ -3,10 +3,16 @@ export {
   loadSetupData,
   saveAllocations,
   saveGoal,
+  saveGoalContribution,
   saveGoalSkipped,
+  saveIncomeEntry,
   saveIncome,
   saveMonthlyPlan,
   savePrimaryGoal,
   saveTransaction,
-  saveUpdatedGoal
+  saveUpdatedGoal,
+  saveRecurringExpense,
+  deleteRecurringExpense,
+  updateTransaction,
+  deleteTransaction
 } from "./setupRepository";
