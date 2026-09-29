@@ -12,7 +12,7 @@ export default function FirstGoalSetupScreen() {
       title="أول هدف لك"
       subtitle="شنو هي أول حاجة تحب توفّر لها؟"
       buttonLabel="إضافة الهدف"
-      onNext={() => router.replace("/(tabs)")}
+      onNext={() => router.replace("/setup/success")}
     >
       <View style={styles.targetIcon}>
         <MaterialCommunityIcons name="target" color={colors.coral} size={36} />
