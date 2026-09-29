@@ -13,7 +13,7 @@ export default function WelcomeInsightsScreen() {
       subtitle="شوف تقارير بسيطة ومقارنة الأشهر باش تبقى دايمًا على الخطة"
       buttonLabel="إبدأ الآن"
       onNext={() => router.replace("/setup/monthly")}
-      onSkip={() => router.replace("/(tabs)")}
+      onSkip={() => router.replace("/setup/monthly")}
     />
   );
 }

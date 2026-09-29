@@ -15,7 +15,7 @@ export default function WelcomeMoneyScreen() {
       featureBody="سجّل مصاريفك اليومية وتابع على وين تروح فلوسك"
       buttonLabel="التالي"
       onNext={() => router.push("/onboarding/goals")}
-      onSkip={() => router.replace("/(tabs)")}
+      onSkip={() => router.replace("/setup/monthly")}
     />
   );
 }

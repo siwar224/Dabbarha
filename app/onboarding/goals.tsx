@@ -13,7 +13,7 @@ export default function WelcomeGoalsScreen() {
       subtitle="حدّد أهدافك وتابع تقدّمك للوصول إليها خطوة بخطوة"
       buttonLabel="التالي"
       onNext={() => router.push("/onboarding/insights")}
-      onSkip={() => router.replace("/(tabs)")}
+      onSkip={() => router.replace("/setup/monthly")}
     />
   );
 }
