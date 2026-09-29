@@ -97,17 +97,33 @@ const defaultSetupData: SetupData = {
   transactions: []
 };
 
+function normalizeSetupData(value: Partial<SetupData> | undefined): SetupData {
+  return {
+    ...defaultSetupData,
+    ...value,
+    advance: value?.advance ?? defaultSetupData.advance,
+    allocations: value?.allocations ?? defaultSetupData.allocations,
+    categoryBudgets: value?.categoryBudgets ?? defaultSetupData.categoryBudgets,
+    monthlyPlans: value?.monthlyPlans ?? [],
+    incomeEntries: value?.incomeEntries ?? [],
+    recurringExpenses: value?.recurringExpenses ?? [],
+    goals: value?.goals ?? [],
+    goalSkipped: value?.goalSkipped ?? false,
+    transactions: value?.transactions ?? []
+  };
+}
+
 const SetupContext = createContext<SetupContextValue | undefined>(undefined);
 
 export function SetupProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<SetupData>(defaultSetupData);
+  const [data, setData] = useState<SetupData>(() => normalizeSetupData(defaultSetupData));
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()));
 
   useEffect(() => {
     async function hydrateSetupData() {
       try {
-        setData(await loadSetupData(defaultSetupData));
+        setData(normalizeSetupData(await loadSetupData(defaultSetupData)));
       } finally {
         setIsLoaded(true);
       }
@@ -122,20 +138,21 @@ export function SetupProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<SetupContextValue>(
     () => {
+      const normalizedData = normalizeSetupData(data);
       const activeMonthKey = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`;
       const saveActiveMonthlyPlan = async (overrides: Partial<SetupMonthlyPlan>) => {
         const plan: SetupMonthlyPlan = {
           monthKey: activeMonthKey,
-          income: overrides.income ?? data.income,
-          advance: overrides.advance ?? data.advance,
-          allocations: overrides.allocations ?? data.allocations,
-          categoryBudgets: overrides.categoryBudgets ?? data.categoryBudgets
+          income: overrides.income ?? normalizedData.income,
+          advance: overrides.advance ?? normalizedData.advance,
+          allocations: overrides.allocations ?? normalizedData.allocations,
+          categoryBudgets: overrides.categoryBudgets ?? normalizedData.categoryBudgets
         };
-        const monthlyPlans = data.monthlyPlans.some((item) => item.monthKey === activeMonthKey)
-          ? data.monthlyPlans.map((item) => (item.monthKey === activeMonthKey ? plan : item))
-          : [plan, ...data.monthlyPlans];
+        const monthlyPlans = normalizedData.monthlyPlans.some((item) => item.monthKey === activeMonthKey)
+          ? normalizedData.monthlyPlans.map((item) => (item.monthKey === activeMonthKey ? plan : item))
+          : [plan, ...normalizedData.monthlyPlans];
         updateData({
-          ...data,
+          ...normalizedData,
           income: plan.income,
           advance: plan.advance,
           allocations: plan.allocations,
@@ -147,21 +164,21 @@ export function SetupProvider({ children }: { children: ReactNode }) {
       const selectMonth = (month: Date) => {
         const nextMonth = startOfMonth(month);
         const monthKey = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}`;
-        const existingPlan = data.monthlyPlans.find((item) => item.monthKey === monthKey);
+        const existingPlan = normalizedData.monthlyPlans.find((item) => item.monthKey === monthKey);
         const nextPlan = existingPlan ?? {
           monthKey,
-          income: data.income,
-          advance: data.advance,
-          allocations: data.allocations.map((allocation) => ({ ...allocation })),
-          categoryBudgets: data.categoryBudgets.map((budget) => ({ ...budget }))
+          income: normalizedData.income,
+          advance: normalizedData.advance,
+          allocations: normalizedData.allocations.map((allocation) => ({ ...allocation })),
+          categoryBudgets: normalizedData.categoryBudgets.map((budget) => ({ ...budget }))
         };
-        const monthlyPlans = existingPlan ? data.monthlyPlans : [nextPlan, ...data.monthlyPlans];
-        const monthIncomeEntries = data.incomeEntries.filter((entry) => entry.monthKey === monthKey);
+        const monthlyPlans = existingPlan ? normalizedData.monthlyPlans : [nextPlan, ...normalizedData.monthlyPlans];
+        const monthIncomeEntries = normalizedData.incomeEntries.filter((entry) => entry.monthKey === monthKey);
         const nextAdvance = monthIncomeEntries
           .filter((entry) => entry.type === "advance")
           .reduce((sum, entry) => sum + entry.amount, 0);
         updateData({
-          ...data,
+          ...normalizedData,
           income: nextPlan.income,
           advance: nextAdvance || nextPlan.advance,
           allocations: nextPlan.allocations,
@@ -175,7 +192,7 @@ export function SetupProvider({ children }: { children: ReactNode }) {
       };
 
       return {
-        ...data,
+        ...normalizedData,
         isLoaded,
         selectedMonth,
         setSelectedMonth: selectMonth,
@@ -194,14 +211,14 @@ export function SetupProvider({ children }: { children: ReactNode }) {
             id: `${Date.now()}`,
             createdAt: new Date().toISOString()
           };
-          const incomeEntries = [savedEntry, ...data.incomeEntries];
+          const incomeEntries = [savedEntry, ...normalizedData.incomeEntries];
           const monthAdvance = incomeEntries
             .filter((item) => item.monthKey === activeMonthKey && item.type === "advance")
             .reduce((sum, item) => sum + item.amount, 0);
-          const monthlyPlans = data.monthlyPlans.map((plan) =>
+          const monthlyPlans = normalizedData.monthlyPlans.map((plan) =>
             plan.monthKey === activeMonthKey ? { ...plan, advance: monthAdvance } : plan
           );
-          updateData({ ...data, advance: monthAdvance, incomeEntries, monthlyPlans });
+          updateData({ ...normalizedData, advance: monthAdvance, incomeEntries, monthlyPlans });
           await saveIncomeEntry(savedEntry);
           const activePlan = monthlyPlans.find((plan) => plan.monthKey === activeMonthKey);
           if (activePlan) {
@@ -218,13 +235,13 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         setGoal: async (goal: SetupGoalInput) => {
         const configuredGoal: SetupGoal = {
           ...goal,
-          id: data.goal?.id ?? data.goals[0]?.id ?? `${Date.now()}`
+          id: normalizedData.goal?.id ?? normalizedData.goals[0]?.id ?? `${Date.now()}`
         };
-        const goals = data.goals.some((item) => item.id === configuredGoal.id)
-          ? data.goals.map((item) => (item.id === configuredGoal.id ? configuredGoal : item))
-          : [configuredGoal, ...data.goals];
+        const goals = normalizedData.goals.some((item) => item.id === configuredGoal.id)
+          ? normalizedData.goals.map((item) => (item.id === configuredGoal.id ? configuredGoal : item))
+          : [configuredGoal, ...normalizedData.goals];
 
-        const nextData = { ...data, goal: configuredGoal, goals, goalSkipped: false };
+        const nextData = { ...normalizedData, goal: configuredGoal, goals, goalSkipped: false };
         updateData(nextData);
         await savePrimaryGoal(configuredGoal, goals);
       },
@@ -235,32 +252,32 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         };
 
         const nextData = {
-          ...data,
-          goal: data.goal ?? newGoal,
-          goals: [newGoal, ...data.goals],
+          ...normalizedData,
+          goal: normalizedData.goal ?? newGoal,
+          goals: [newGoal, ...normalizedData.goals],
           goalSkipped: false
         };
 
         updateData(nextData);
-        await saveGoal(newGoal, !data.goal);
+        await saveGoal(newGoal, !normalizedData.goal);
 
         return newGoal.id;
       },
         addGoalContribution: async (amount: number) => {
-          if (!data.goal || !Number.isFinite(amount) || amount <= 0) {
+          if (!normalizedData.goal || !Number.isFinite(amount) || amount <= 0) {
             return false;
           }
           const source = `monthly-savings:${activeMonthKey}`;
-          const saved = await saveGoalContribution(data.goal.id, amount, new Date().toISOString(), source);
+          const saved = await saveGoalContribution(normalizedData.goal.id, amount, new Date().toISOString(), source);
           if (!saved) {
             return false;
           }
           const updatedGoal: SetupGoal = {
-            ...data.goal,
-            savedAmount: data.goal.savedAmount + amount
+            ...normalizedData.goal,
+            savedAmount: normalizedData.goal.savedAmount + amount
           };
-          const goals = data.goals.map((item) => (item.id === updatedGoal.id ? updatedGoal : item));
-          updateData({ ...data, goal: updatedGoal, goals });
+          const goals = normalizedData.goals.map((item) => (item.id === updatedGoal.id ? updatedGoal : item));
+          updateData({ ...normalizedData, goal: updatedGoal, goals });
           await saveUpdatedGoal(updatedGoal.id, {
             title: updatedGoal.title,
             targetAmount: updatedGoal.targetAmount,
@@ -277,16 +294,16 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         };
 
         const nextData = {
-          ...data,
-          goal: data.goal?.id === goalId ? updatedGoal : data.goal,
-          goals: data.goals.map((item) => (item.id === goalId ? updatedGoal : item))
+          ...normalizedData,
+          goal: normalizedData.goal?.id === goalId ? updatedGoal : normalizedData.goal,
+          goals: normalizedData.goals.map((item) => (item.id === goalId ? updatedGoal : item))
         };
 
         updateData(nextData);
         await saveUpdatedGoal(goalId, goal);
       },
         skipGoal: async () => {
-        const nextData = { ...data, goal: undefined, goalSkipped: true };
+        const nextData = { ...normalizedData, goal: undefined, goalSkipped: true };
         updateData(nextData);
         await saveGoalSkipped();
       },
@@ -297,8 +314,8 @@ export function SetupProvider({ children }: { children: ReactNode }) {
           createdAt: new Date().toISOString()
         };
         const nextData = {
-          ...data,
-          transactions: [savedTransaction, ...data.transactions]
+          ...normalizedData,
+          transactions: [savedTransaction, ...normalizedData.transactions]
         };
 
         updateData(nextData);
@@ -306,15 +323,15 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         },
         updateTransaction: async (transaction) => {
           updateData({
-            ...data,
-            transactions: data.transactions.map((item) => (item.id === transaction.id ? transaction : item))
+            ...normalizedData,
+            transactions: normalizedData.transactions.map((item) => (item.id === transaction.id ? transaction : item))
           });
           await updateTransaction(transaction);
         },
         deleteTransaction: async (transactionId: string) => {
           updateData({
-            ...data,
-            transactions: data.transactions.filter((item) => item.id !== transactionId)
+            ...normalizedData,
+            transactions: normalizedData.transactions.filter((item) => item.id !== transactionId)
           });
           await deleteTransaction(transactionId);
         },
@@ -325,8 +342,8 @@ export function SetupProvider({ children }: { children: ReactNode }) {
             createdAt: new Date().toISOString()
           };
           updateData({
-            ...data,
-            recurringExpenses: [savedRecurring, ...data.recurringExpenses]
+            ...normalizedData,
+            recurringExpenses: [savedRecurring, ...normalizedData.recurringExpenses]
           });
           await saveRecurringExpense(savedRecurring);
         }
