@@ -7,6 +7,7 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <Stack initialRouteName="onboarding" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="onboarding" />
+        <Stack.Screen name="setup" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="goal/add" />
         <Stack.Screen name="goal/[id]" />
