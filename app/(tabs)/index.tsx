@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { expenseCategories } from "@/constants/categories";
 import { homePreviewData, type HomeMetricPreview } from "@/constants/homePreviewData";
 import { useSetup } from "@/context/SetupContext";
+import { calculateFinanceSummary } from "@/services/financeService";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
 
@@ -14,34 +15,31 @@ const walletHero = require("../../assets/images/wallet-hero-transparent.png");
 
 export default function HomeScreen() {
   const { income, allocations, goal, transactions } = useSetup();
-  const spent = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const saved = Math.max(income - spent, 0);
-  const savingsTarget = allocations.find((item) => item.id === "saving")?.amount ?? 0;
-  const remaining = Math.max(income - spent - savingsTarget, 0);
+  const summary = calculateFinanceSummary(income, allocations, transactions);
   const activeGoal = goal ?? {
     title: "هدفي: تليفون",
     targetAmount: 950,
     savedAmount: 300
   };
   const goalProgress = Math.min(activeGoal.savedAmount / Math.max(activeGoal.targetAmount, 1), 1);
-  const latestExpenses = transactions.slice(0, 3);
+  const latestExpenses = summary.monthTransactions.slice(0, 3);
 
   const metrics: HomeMetricPreview[] = [
     {
       label: "صرفت",
-      amount: spent,
+      amount: summary.totalSpent,
       icon: "chart-bar",
       tone: "coral"
     },
     {
       label: "وفّرت",
-      amount: saved,
+      amount: summary.remainingSavings,
       icon: "piggy-bank-outline",
       tone: "gold"
     },
     {
       label: "باقيلي",
-      amount: remaining,
+      amount: summary.remainingPlanned,
       icon: "clock-outline",
       tone: "lavender"
     }
@@ -89,6 +87,8 @@ export default function HomeScreen() {
             <MetricCard key={metric.label} metric={metric} />
           ))}
         </View>
+
+        <BudgetStatusCard summary={summary} />
 
         <Pressable style={styles.goalCard}>
           <View style={styles.goalIconWrap}>
@@ -145,6 +145,57 @@ function MetricCard({ metric }: { metric: HomeMetricPreview }) {
       <MaterialCommunityIcons name={metric.icon} color={metricIconColors[metric.tone]} size={30} />
       <Text style={styles.metricLabel}>{metric.label}</Text>
       <Text style={styles.metricAmount}>{formatMoney(metric.amount)}</Text>
+    </View>
+  );
+}
+
+function BudgetStatusCard({ summary }: { summary: ReturnType<typeof calculateFinanceSummary> }) {
+  return (
+    <View style={styles.budgetCard}>
+      <View style={styles.budgetHeader}>
+        <MaterialCommunityIcons name="chart-donut" color={colors.primary} size={25} />
+        <Text style={styles.budgetTitle}>متابعة الخطة</Text>
+      </View>
+
+      <BudgetRow label="مصاريف ثابتة" spent={summary.fixedSpent} budget={summary.fixedBudget} overrun={summary.fixedOverrun} />
+      <BudgetRow label="مصاريف زايدة" spent={summary.extraSpent} budget={summary.extraBudget} overrun={summary.extraOverrun} />
+
+      <View style={styles.transportSummary}>
+        <View style={styles.transportIcon}>
+          <MaterialCommunityIcons name="bus" color={colors.primary} size={22} />
+        </View>
+        <View style={styles.transportText}>
+          <Text style={styles.transportTitle}>ترانسبور اليوم</Text>
+          <Text style={styles.transportHint}>هذا الشهر: {formatMoney(summary.transportThisMonth)}</Text>
+        </View>
+        <Text style={styles.transportAmount}>{formatMoney(summary.todayTransport)}</Text>
+      </View>
+
+      {summary.savingsUsed > 0 ? (
+        <View style={styles.savingsWarning}>
+          <MaterialCommunityIcons name="alert-circle-outline" color={colors.coral} size={20} />
+          <Text style={styles.savingsWarningText}>استعملت من الادخار {formatMoney(summary.savingsUsed)}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function BudgetRow({ label, spent, budget, overrun }: { label: string; spent: number; budget: number; overrun: number }) {
+  const progress = budget > 0 ? Math.min(spent / budget, 1) : 0;
+  const color = overrun > 0 ? colors.coral : colors.primary;
+
+  return (
+    <View style={styles.budgetRow}>
+      <View style={styles.budgetRowText}>
+        <Text style={styles.budgetRowLabel}>{label}</Text>
+        <Text style={[styles.budgetRowAmount, { color }]}>
+          {formatMoney(spent)} / {formatMoney(budget)}
+        </Text>
+      </View>
+      <View style={styles.budgetTrack}>
+        <View style={[styles.budgetFill, { width: `${progress * 100}%`, backgroundColor: color }]} />
+      </View>
     </View>
   );
 }
@@ -318,6 +369,111 @@ const styles = StyleSheet.create({
     fontSize: 25,
     fontWeight: "900",
     textAlign: "center"
+  },
+  budgetCard: {
+    marginTop: 16,
+    borderRadius: 22,
+    padding: 18,
+    backgroundColor: colors.surface,
+    shadowColor: "#4B3B2D",
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 2
+  },
+  budgetHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8
+  },
+  budgetTitle: {
+    color: colors.primary,
+    fontSize: 19,
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  budgetRow: {
+    marginTop: 14
+  },
+  budgetRowText: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+  budgetRowLabel: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "800",
+    textAlign: "right"
+  },
+  budgetRowAmount: {
+    fontSize: 14,
+    fontWeight: "900"
+  },
+  budgetTrack: {
+    height: 10,
+    marginTop: 7,
+    overflow: "hidden",
+    borderRadius: 5,
+    backgroundColor: "#F0EDEB"
+  },
+  budgetFill: {
+    height: "100%",
+    borderRadius: 5
+  },
+  transportSummary: {
+    minHeight: 54,
+    marginTop: 16,
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 12
+  },
+  transportIcon: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: colors.lavender
+  },
+  transportText: {
+    flex: 1,
+    alignItems: "flex-end"
+  },
+  transportTitle: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "right"
+  },
+  transportHint: {
+    marginTop: 2,
+    color: colors.mutedText,
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "right"
+  },
+  transportAmount: {
+    color: colors.primary,
+    fontSize: 19,
+    fontWeight: "900"
+  },
+  savingsWarning: {
+    marginTop: 12,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 6
+  },
+  savingsWarningText: {
+    color: colors.coral,
+    fontSize: 13,
+    fontWeight: "800",
+    textAlign: "right"
   },
   goalCard: {
     minHeight: 140,

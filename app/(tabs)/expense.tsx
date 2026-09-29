@@ -13,7 +13,7 @@ export default function ExpenseScreen() {
   const { addTransaction } = useSetup();
   const [amount, setAmount] = useState("25");
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>("transport");
-  const [isUnplanned, setIsUnplanned] = useState(true);
+  const [isUnplanned, setIsUnplanned] = useState(false);
   const [note, setNote] = useState("");
 
   async function handleSubmit() {

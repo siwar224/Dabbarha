@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories } from "@/constants/categories";
 import { useSetup, type SetupTransaction } from "@/context/SetupContext";
+import { calculateFinanceSummary } from "@/services/financeService";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
 
@@ -34,10 +35,11 @@ const monthComparisons = [
 ] as const;
 
 export default function AccountsScreen() {
-  const { income, transactions } = useSetup();
-  const spent = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
-  const savings = Math.max(income - spent, 0);
-  const latestTransactions = transactions.slice(0, 3);
+  const { income, allocations, transactions } = useSetup();
+  const summary = calculateFinanceSummary(income, allocations, transactions);
+  const spent = summary.totalSpent;
+  const savings = summary.remainingSavings;
+  const latestTransactions = summary.monthTransactions.slice(0, 3);
   const accountMetrics: AccountMetric[] = [
     {
       label: "الدخل",
@@ -60,7 +62,7 @@ export default function AccountsScreen() {
   ];
   const categoryBreakdown: CategoryBreakdownItem[] = expenseCategories
     .map((category, index) => {
-      const amount = transactions
+      const amount = summary.monthTransactions
         .filter((transaction) => transaction.category === category.id)
         .reduce((sum, transaction) => sum + transaction.amount, 0);
 
