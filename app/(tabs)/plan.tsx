@@ -17,7 +17,7 @@ const planWallet = require("../../assets/images/wallet-plan.png");
 const phoneGoal = require("../../assets/images/phone-goal.png");
 
 export default function PlanScreen() {
-  const { income, allocations, goal, selectedMonth } = useSetup();
+  const { income, advance, allocations, goal, selectedMonth } = useSetup();
   const upcomingMonths = [
     { month: formatMonthName(addMonths(selectedMonth, 0)), amount: 300, color: colors.coral, background: colors.softCoral, progress: 0.44 },
     { month: formatMonthName(addMonths(selectedMonth, 1)), amount: 500, color: "#756BD8", background: colors.lavender, progress: 0.56 },
@@ -58,8 +58,8 @@ export default function PlanScreen() {
             <Text style={styles.salaryLabel}>شهريتي الحالية</Text>
             <Text style={styles.salaryAmount}>{formatMoney(income)}</Text>
             <View style={styles.growthPill}>
-              <MaterialCommunityIcons name="chart-line-variant" color={colors.surface} size={20} />
-              <Text style={styles.growthText}>من جانفي تولّي 1000 د</Text>
+              <MaterialCommunityIcons name="cash-fast" color={colors.surface} size={20} />
+              <Text style={styles.growthText}>{advance > 0 ? `تسلّمت مسبقًا ${formatMoney(advance)}` : "خطة الشهر الحالية"}</Text>
             </View>
           </View>
         </View>

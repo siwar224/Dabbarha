@@ -29,9 +29,18 @@ export type SetupTransaction = {
   createdAt: string;
 };
 
+export type SetupMonthlyPlan = {
+  monthKey: string;
+  income: number;
+  advance: number;
+  allocations: SetupAllocation[];
+};
+
 export type SetupData = {
   income: number;
+  advance: number;
   allocations: SetupAllocation[];
+  monthlyPlans: SetupMonthlyPlan[];
   goal?: SetupGoal;
   goals: SetupGoal[];
   goalSkipped: boolean;

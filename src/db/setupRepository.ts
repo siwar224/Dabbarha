@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SQLite from "expo-sqlite";
 
 import { DATABASE_NAME, DATABASE_VERSION, migrations } from "@/db/schema";
-import type { SetupAllocation, SetupData, SetupGoal, SetupGoalInput, SetupTransaction } from "@/types/setup";
+import type { SetupAllocation, SetupData, SetupGoal, SetupGoalInput, SetupMonthlyPlan, SetupTransaction } from "@/types/setup";
 
 const LEGACY_STORAGE_KEY = "dabbirha.setup.v1";
 const MIGRATED_LEGACY_KEY = "legacyAsyncStorageMigrated";
@@ -17,6 +17,18 @@ type AllocationRow = {
   amount: number;
   icon: SetupAllocation["icon"];
   tone: SetupAllocation["tone"];
+};
+
+type MonthlyPlanRow = {
+  month: number;
+  year: number;
+  income: number;
+  advance: number;
+};
+
+type MonthlyAllocationRow = AllocationRow & {
+  month: number;
+  year: number;
 };
 
 type GoalRow = {
@@ -63,6 +75,7 @@ async function migrateDatabase(database: SQLite.SQLiteDatabase) {
   await ensureColumn(database, "goals", "savedAmount", "REAL NOT NULL DEFAULT 0");
   await ensureColumn(database, "goals", "imageUri", "TEXT");
   await ensureColumn(database, "goals", "isPrimary", "INTEGER NOT NULL DEFAULT 0");
+  await ensureColumn(database, "monthly_plans", "advance", "REAL NOT NULL DEFAULT 0");
   await database.execAsync(`PRAGMA user_version = ${DATABASE_VERSION};`);
 }
 
@@ -76,6 +89,15 @@ async function ensureColumn(database: SQLite.SQLiteDatabase, tableName: string, 
 function parseNumber(value: string | undefined, fallback: number) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : fallback;
+}
+
+function getMonthKey(month: number, year: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
+function getMonthParts(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return { year, month: month - 1 };
 }
 
 async function getSetting(database: SQLite.SQLiteDatabase, key: string) {
@@ -121,6 +143,8 @@ function normalizeLegacySetupData(defaultData: SetupData, rawData: unknown): Set
   return {
     ...defaultData,
     ...parsed,
+    advance: parsed.advance ?? defaultData.advance,
+    monthlyPlans: parsed.monthlyPlans ?? [],
     goals,
     goal: parsed.goal ?? goals[0],
     goalSkipped: parsed.goalSkipped ?? false,
@@ -131,6 +155,7 @@ function normalizeLegacySetupData(defaultData: SetupData, rawData: unknown): Set
 async function persistSetupSnapshot(database: SQLite.SQLiteDatabase, data: SetupData) {
   await database.withTransactionAsync(async () => {
     await setSetting(database, "income", String(data.income));
+    await setSetting(database, "advance", String(data.advance));
     await setSetting(database, "goalSkipped", String(data.goalSkipped));
     await setSetting(database, "primaryGoalId", data.goal?.id ?? "");
 
@@ -147,6 +172,14 @@ async function persistSetupSnapshot(database: SQLite.SQLiteDatabase, data: Setup
         index
       );
     }
+
+    const currentDate = new Date();
+    await upsertMonthlyPlanRows(database, data.monthlyPlans[0] ?? {
+      monthKey: getMonthKey(currentDate.getMonth(), currentDate.getFullYear()),
+      income: data.income,
+      advance: data.advance,
+      allocations: data.allocations
+    });
 
     await database.runAsync("DELETE FROM goals;");
     for (const goal of data.goals) {
@@ -220,17 +253,68 @@ async function insertTransactionRow(database: SQLite.SQLiteDatabase, transaction
   );
 }
 
+async function upsertMonthlyPlanRows(database: SQLite.SQLiteDatabase, plan: SetupMonthlyPlan) {
+  const { month, year } = getMonthParts(plan.monthKey);
+  const now = new Date().toISOString();
+  const plannedExpenses = plan.allocations
+    .filter((allocation) => allocation.id !== "saving")
+    .reduce((sum, allocation) => sum + allocation.amount, 0);
+  const savingsTarget = plan.allocations.find((allocation) => allocation.id === "saving")?.amount ?? 0;
+
+  await database.runAsync(
+    `INSERT INTO monthly_plans (month, year, income, advance, plannedExpenses, savingsTarget, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(month, year) DO UPDATE SET
+       income = excluded.income,
+       advance = excluded.advance,
+       plannedExpenses = excluded.plannedExpenses,
+       savingsTarget = excluded.savingsTarget,
+       updatedAt = excluded.updatedAt;`,
+    month,
+    year,
+    plan.income,
+    plan.advance,
+    plannedExpenses,
+    savingsTarget,
+    now,
+    now
+  );
+
+  await database.runAsync("DELETE FROM monthly_plan_allocations WHERE month = ? AND year = ?;", month, year);
+  for (const [index, allocation] of plan.allocations.entries()) {
+    await database.runAsync(
+      `INSERT INTO monthly_plan_allocations (month, year, id, label, amount, icon, tone, sortOrder)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      month,
+      year,
+      allocation.id,
+      allocation.label,
+      allocation.amount,
+      allocation.icon,
+      allocation.tone,
+      index
+    );
+  }
+}
+
 export async function loadSetupData(defaultData: SetupData): Promise<SetupData> {
   const database = await getDatabase();
   await migrateLegacyStorageIfNeeded(database, defaultData);
 
-  const [incomeValue, goalSkippedValue, primaryGoalIdValue, allocationRows, goalRows, transactionRows] =
+  const [incomeValue, advanceValue, goalSkippedValue, primaryGoalIdValue, allocationRows, monthlyPlanRows, monthlyAllocationRows, goalRows, transactionRows] =
     await Promise.all([
       getSetting(database, "income"),
+      getSetting(database, "advance"),
       getSetting(database, "goalSkipped"),
       getSetting(database, "primaryGoalId"),
       database.getAllAsync<AllocationRow>(
         "SELECT id, label, amount, icon, tone FROM monthly_allocations ORDER BY sortOrder ASC;"
+      ),
+      database.getAllAsync<MonthlyPlanRow>(
+        "SELECT month, year, income, advance FROM monthly_plans ORDER BY year ASC, month ASC;"
+      ),
+      database.getAllAsync<MonthlyAllocationRow>(
+        "SELECT month, year, id, label, amount, icon, tone FROM monthly_plan_allocations ORDER BY year ASC, month ASC, sortOrder ASC;"
       ),
       database.getAllAsync<GoalRow>(
         "SELECT id, title, targetAmount, savedAmount, targetDate, imageUri, isPrimary FROM goals ORDER BY updatedAt DESC;"
@@ -245,10 +329,48 @@ export async function loadSetupData(defaultData: SetupData): Promise<SetupData> 
     goals.find((goal) => goal.id === primaryGoalIdValue) ??
     goals.find((goal, index) => goalRows[index]?.isPrimary === 1);
 
+  const legacyIncome = parseNumber(incomeValue, defaultData.income);
+  const legacyAdvance = parseNumber(advanceValue, defaultData.advance);
+  const legacyAllocations = allocationRows.length > 0 ? allocationRows : defaultData.allocations;
+  const allocationsByMonth = new Map<string, SetupAllocation[]>();
+  for (const allocation of monthlyAllocationRows) {
+    const key = getMonthKey(allocation.month, allocation.year);
+    const current = allocationsByMonth.get(key) ?? [];
+    current.push({
+      id: allocation.id,
+      label: allocation.label,
+      amount: allocation.amount,
+      icon: allocation.icon,
+      tone: allocation.tone
+    });
+    allocationsByMonth.set(key, current);
+  }
+
+  const monthlyPlans = monthlyPlanRows.map((row) => ({
+    monthKey: getMonthKey(row.month, row.year),
+    income: row.income,
+    advance: row.advance ?? 0,
+    allocations: allocationsByMonth.get(getMonthKey(row.month, row.year)) ?? legacyAllocations
+  }));
+  const currentDate = new Date();
+  const currentMonthKey = getMonthKey(currentDate.getMonth(), currentDate.getFullYear());
+  const currentPlan = monthlyPlans.find((plan) => plan.monthKey === currentMonthKey) ?? {
+    monthKey: currentMonthKey,
+    income: legacyIncome,
+    advance: legacyAdvance,
+    allocations: legacyAllocations
+  };
+  if (!monthlyPlans.some((plan) => plan.monthKey === currentMonthKey)) {
+    monthlyPlans.unshift(currentPlan);
+    await upsertMonthlyPlanRows(database, currentPlan);
+  }
+
   return {
     ...defaultData,
-    income: parseNumber(incomeValue, defaultData.income),
-    allocations: allocationRows.length > 0 ? allocationRows : defaultData.allocations,
+    income: currentPlan.income,
+    advance: currentPlan.advance,
+    allocations: currentPlan.allocations,
+    monthlyPlans,
     goal: goalSkippedValue === "true" ? undefined : primaryGoal,
     goals,
     goalSkipped: goalSkippedValue === "true",
@@ -259,6 +381,13 @@ export async function loadSetupData(defaultData: SetupData): Promise<SetupData> 
 export async function saveIncome(income: number) {
   const database = await getDatabase();
   await setSetting(database, "income", String(income));
+}
+
+export async function saveMonthlyPlan(plan: SetupMonthlyPlan) {
+  const database = await getDatabase();
+  await database.withTransactionAsync(async () => {
+    await upsertMonthlyPlanRows(database, plan);
+  });
 }
 
 export async function saveAllocations(allocations: SetupAllocation[]) {

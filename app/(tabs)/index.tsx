@@ -23,7 +23,7 @@ type HomeMetricPreview = {
 };
 
 export default function HomeScreen() {
-  const { income, allocations, goal, transactions, selectedMonth } = useSetup();
+  const { income, advance, allocations, goal, transactions, selectedMonth } = useSetup();
   const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth);
   const activeGoal = goal ?? {
     title: "هدفي: تليفون",
@@ -82,6 +82,7 @@ export default function HomeScreen() {
           <View style={styles.heroTextBlock}>
             <Text style={styles.heroLabel}>شهريتي</Text>
             <Text style={styles.heroAmount}>{formatMoney(income)}</Text>
+            {advance > 0 ? <Text style={styles.heroAdvance}>منها avance {formatMoney(advance)}</Text> : null}
           </View>
           <Image source={walletHero} style={styles.heroImage} resizeMode="contain" />
           <MaterialCommunityIcons name="star-four-points" color={colors.gold} size={20} style={styles.heroSpark} />
@@ -334,6 +335,13 @@ const styles = StyleSheet.create({
     fontSize: 42,
     fontWeight: "900",
     lineHeight: 50,
+    textAlign: "center"
+  },
+  heroAdvance: {
+    marginTop: -2,
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 12,
+    fontWeight: "800",
     textAlign: "center"
   },
   heroImage: {

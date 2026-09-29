@@ -6,11 +6,12 @@ import {
   saveGoal,
   saveGoalSkipped,
   saveIncome,
+  saveMonthlyPlan,
   savePrimaryGoal,
   saveTransaction,
   saveUpdatedGoal
 } from "@/db";
-import type { SetupAllocation, SetupData, SetupGoal, SetupGoalInput, SetupTransaction } from "@/types/setup";
+import type { SetupAllocation, SetupData, SetupGoal, SetupGoalInput, SetupMonthlyPlan, SetupTransaction } from "@/types/setup";
 import { addMonths, startOfMonth } from "@/utils/month";
 
 export type { SetupAllocation, SetupGoal, SetupGoalInput, SetupTransaction } from "@/types/setup";
@@ -20,6 +21,7 @@ type SetupContextValue = SetupData & {
   selectedMonth: Date;
   setSelectedMonth: (month: Date) => void;
   moveSelectedMonth: (amount: number) => void;
+  setAdvance: (advance: number) => Promise<void>;
   setIncome: (income: number) => Promise<void>;
   setAllocations: (allocations: SetupAllocation[]) => Promise<void>;
   setGoal: (goal: SetupGoalInput) => Promise<void>;
@@ -31,6 +33,7 @@ type SetupContextValue = SetupData & {
 
 const defaultSetupData: SetupData = {
   income: 800,
+  advance: 0,
   allocations: [
     {
       id: "fixed",
@@ -54,6 +57,7 @@ const defaultSetupData: SetupData = {
       tone: "blue"
     }
   ],
+  monthlyPlans: [],
   goals: [],
   goalSkipped: false,
   transactions: []
@@ -83,23 +87,57 @@ export function SetupProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<SetupContextValue>(
-    () => ({
-      ...data,
-      isLoaded,
-      selectedMonth,
-      setSelectedMonth: (month: Date) => setSelectedMonth(startOfMonth(month)),
-      moveSelectedMonth: (amount: number) => setSelectedMonth((currentMonth) => addMonths(currentMonth, amount)),
-      setIncome: async (income: number) => {
-        const nextData = { ...data, income };
-        updateData(nextData);
-        await saveIncome(income);
-      },
-      setAllocations: async (allocations: SetupAllocation[]) => {
-        const nextData = { ...data, allocations };
-        updateData(nextData);
-        await saveAllocations(allocations);
-      },
-      setGoal: async (goal: SetupGoalInput) => {
+    () => {
+      const activeMonthKey = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, "0")}`;
+      const saveActiveMonthlyPlan = async (overrides: Partial<SetupMonthlyPlan>) => {
+        const plan: SetupMonthlyPlan = {
+          monthKey: activeMonthKey,
+          income: overrides.income ?? data.income,
+          advance: overrides.advance ?? data.advance,
+          allocations: overrides.allocations ?? data.allocations
+        };
+        const monthlyPlans = data.monthlyPlans.some((item) => item.monthKey === activeMonthKey)
+          ? data.monthlyPlans.map((item) => (item.monthKey === activeMonthKey ? plan : item))
+          : [plan, ...data.monthlyPlans];
+        updateData({ ...data, income: plan.income, advance: plan.advance, allocations: plan.allocations, monthlyPlans });
+        await saveMonthlyPlan(plan);
+      };
+      const selectMonth = (month: Date) => {
+        const nextMonth = startOfMonth(month);
+        const monthKey = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, "0")}`;
+        const existingPlan = data.monthlyPlans.find((item) => item.monthKey === monthKey);
+        const nextPlan = existingPlan ?? {
+          monthKey,
+          income: data.income,
+          advance: data.advance,
+          allocations: data.allocations.map((allocation) => ({ ...allocation }))
+        };
+        const monthlyPlans = existingPlan ? data.monthlyPlans : [nextPlan, ...data.monthlyPlans];
+        updateData({ ...data, income: nextPlan.income, advance: nextPlan.advance, allocations: nextPlan.allocations, monthlyPlans });
+        setSelectedMonth(nextMonth);
+        if (!existingPlan) {
+          void saveMonthlyPlan(nextPlan);
+        }
+      };
+
+      return {
+        ...data,
+        isLoaded,
+        selectedMonth,
+        setSelectedMonth: selectMonth,
+        moveSelectedMonth: (amount: number) => selectMonth(addMonths(selectedMonth, amount)),
+        setIncome: async (income: number) => {
+          await saveActiveMonthlyPlan({ income });
+          await saveIncome(income);
+        },
+        setAdvance: async (advance: number) => {
+          await saveActiveMonthlyPlan({ advance });
+        },
+        setAllocations: async (allocations: SetupAllocation[]) => {
+          await saveActiveMonthlyPlan({ allocations });
+          await saveAllocations(allocations);
+        },
+        setGoal: async (goal: SetupGoalInput) => {
         const configuredGoal: SetupGoal = {
           ...goal,
           id: data.goal?.id ?? data.goals[0]?.id ?? `${Date.now()}`
@@ -112,7 +150,7 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         updateData(nextData);
         await savePrimaryGoal(configuredGoal, goals);
       },
-      addGoal: async (goal: SetupGoalInput) => {
+        addGoal: async (goal: SetupGoalInput) => {
         const newGoal: SetupGoal = {
           ...goal,
           id: `${Date.now()}`
@@ -130,7 +168,7 @@ export function SetupProvider({ children }: { children: ReactNode }) {
 
         return newGoal.id;
       },
-      updateGoal: async (goalId: string, goal: SetupGoalInput) => {
+        updateGoal: async (goalId: string, goal: SetupGoalInput) => {
         const updatedGoal: SetupGoal = {
           ...goal,
           id: goalId
@@ -145,12 +183,12 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         updateData(nextData);
         await saveUpdatedGoal(goalId, goal);
       },
-      skipGoal: async () => {
+        skipGoal: async () => {
         const nextData = { ...data, goal: undefined, goalSkipped: true };
         updateData(nextData);
         await saveGoalSkipped();
       },
-      addTransaction: async (transaction) => {
+        addTransaction: async (transaction) => {
         const savedTransaction = {
           ...transaction,
           id: `${Date.now()}`,
@@ -163,8 +201,9 @@ export function SetupProvider({ children }: { children: ReactNode }) {
 
         updateData(nextData);
         await saveTransaction(savedTransaction);
-      }
-    }),
+        }
+      };
+    },
     [data, isLoaded, selectedMonth, updateData]
   );
 

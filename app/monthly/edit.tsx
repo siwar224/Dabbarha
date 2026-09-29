@@ -9,16 +9,18 @@ import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 
 export default function EditMonthlyScreen() {
-  const { income, setIncome } = useSetup();
+  const { income, advance, setIncome, setAdvance } = useSetup();
   const [salary, setSalary] = useState(String(income));
-  const [copyPreviousMonth, setCopyPreviousMonth] = useState(true);
+  const [advanceAmount, setAdvanceAmount] = useState(String(advance));
 
   useEffect(() => {
     setSalary(String(income));
-  }, [income]);
+    setAdvanceAmount(String(advance));
+  }, [advance, income]);
 
   async function handleSave() {
     await setIncome(Number(salary) || 0);
+    await setAdvance(Number(advanceAmount) || 0);
     router.back();
   }
 
@@ -54,23 +56,24 @@ export default function EditMonthlyScreen() {
           </View>
         </View>
 
-        <View style={styles.copyCard}>
-          <Pressable
-            onPress={() => setCopyPreviousMonth((value) => !value)}
-            style={[
-              styles.switchTrack,
-              copyPreviousMonth ? styles.switchTrackOn : styles.switchTrackOff
-            ]}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: copyPreviousMonth }}
-          >
-            <View style={[styles.switchThumb, copyPreviousMonth ? styles.switchThumbOn : styles.switchThumbOff]} />
-          </Pressable>
-
-          <View style={styles.copyTextWrap}>
-            <Text style={styles.copyTitle}>نسخ من الشهر السابق</Text>
-            <Text style={styles.copySubtitle}>نسخ نفس التوزيع للمصاريف والادخار</Text>
+        <View style={styles.advanceCard}>
+          <Text style={styles.fieldLabel}>الدفعة المسبقة (د)</Text>
+          <View style={styles.inputRow}>
+            <Text style={styles.currency}>د</Text>
+            <TextInput
+              value={advanceAmount}
+              onChangeText={setAdvanceAmount}
+              keyboardType="numeric"
+              style={styles.input}
+              textAlign="center"
+              placeholder="0"
+              placeholderTextColor={colors.mutedText}
+            />
+            <View style={styles.advanceIcon}>
+              <MaterialCommunityIcons name="cash-fast" color={colors.primary} size={27} />
+            </View>
           </View>
+          <Text style={styles.advanceHint}>جزء من الشهرية استلمتو مسبقًا، ما يتحسبش مرة ثانية</Text>
         </View>
 
         <Pressable onPress={handleSave} style={styles.saveButton}>
@@ -180,14 +183,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.lavender
   },
-  copyCard: {
-    minHeight: 104,
-    marginTop: 26,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
+  advanceCard: {
+    minHeight: 126,
+    marginTop: 16,
     borderRadius: 20,
-    paddingHorizontal: 18,
+    padding: 12,
     backgroundColor: colors.surface,
     shadowColor: "#4B3B2D",
     shadowOpacity: 0.06,
@@ -195,57 +195,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 2
   },
-  copyTextWrap: {
-    alignItems: "flex-end",
-    flex: 1
-  },
-  copyTitle: {
-    color: colors.primary,
-    fontSize: 17,
-    fontWeight: "900",
-    textAlign: "right"
-  },
-  copySubtitle: {
-    marginTop: 5,
+  advanceHint: {
+    marginTop: 8,
     color: colors.mutedText,
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "800",
     textAlign: "right"
   },
-  switchTrack: {
-    width: 58,
-    height: 34,
+  advanceIcon: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
     justifyContent: "center",
-    borderRadius: 17,
-    paddingHorizontal: 4
-  },
-  switchTrackOn: {
-    alignItems: "flex-end",
-    backgroundColor: "#244ACF"
-  },
-  switchTrackOff: {
-    alignItems: "flex-start",
-    backgroundColor: "#D9D6D0"
-  },
-  switchThumb: {
-    width: 27,
-    height: 27,
     borderRadius: 14,
-    backgroundColor: colors.surface
-  },
-  switchThumbOn: {
-    shadowColor: colors.primary,
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2
-  },
-  switchThumbOff: {
-    shadowColor: "#4B3B2D",
-    shadowOpacity: 0.14,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1
+    backgroundColor: colors.softGold
   },
   saveButton: {
     minHeight: 58,

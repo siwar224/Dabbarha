@@ -1,6 +1,6 @@
 export const DATABASE_NAME = "dabbirha.db";
 
-export const DATABASE_VERSION = 1;
+export const DATABASE_VERSION = 2;
 
 export const migrations = [
   `
@@ -74,6 +74,19 @@ export const migrations = [
     icon TEXT NOT NULL,
     tone TEXT NOT NULL,
     sortOrder INTEGER NOT NULL DEFAULT 0
+  );
+  `,
+  `
+  CREATE TABLE IF NOT EXISTS monthly_plan_allocations (
+    month INTEGER NOT NULL,
+    year INTEGER NOT NULL,
+    id TEXT NOT NULL,
+    label TEXT NOT NULL,
+    amount REAL NOT NULL,
+    icon TEXT NOT NULL,
+    tone TEXT NOT NULL,
+    sortOrder INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (month, year, id)
   );
   `
 ] as const;

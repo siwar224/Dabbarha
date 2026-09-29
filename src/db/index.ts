@@ -5,6 +5,7 @@ export {
   saveGoal,
   saveGoalSkipped,
   saveIncome,
+  saveMonthlyPlan,
   savePrimaryGoal,
   saveTransaction,
   saveUpdatedGoal
