@@ -6,13 +6,14 @@ import { StyleSheet, Text, TextInput, View } from "react-native";
 import { SetupFlowScreen } from "@/components/SetupFlowScreen";
 import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
+import { formatMonthYear } from "@/utils/month";
 
 export default function FirstGoalSetupScreen() {
   const { goal, setGoal, skipGoal } = useSetup();
   const [title, setTitle] = useState(goal?.title ?? "تليفون جديد");
   const [targetAmount, setTargetAmount] = useState(goal ? String(goal.targetAmount) : "950");
   const [savedAmount, setSavedAmount] = useState(goal ? String(goal.savedAmount) : "300");
-  const [targetDate, setTargetDate] = useState(goal?.targetDate ?? "ديسمبر 2024");
+  const [targetDate, setTargetDate] = useState(goal?.targetDate ?? formatMonthYear(new Date(new Date().getFullYear(), 11, 1)));
 
   useEffect(() => {
     if (goal) {
@@ -64,7 +65,7 @@ export default function FirstGoalSetupScreen() {
             onChangeText={setTargetDate}
             style={styles.dateInput}
             textAlign="right"
-            placeholder="ديسمبر 2024"
+            placeholder={formatMonthYear(new Date())}
             placeholderTextColor={colors.mutedText}
           />
           <Text style={styles.fieldLabel}>التاريخ المستهدف (اختياري)</Text>

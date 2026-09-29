@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { Image, ImageSourcePropType, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { MonthNavigator } from "@/components/MonthNavigator";
 import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
@@ -89,11 +90,7 @@ export default function GoalsScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={22} />
-          <Text style={styles.monthText}>نوفمبر 2024</Text>
-          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
-        </Pressable>
+        <MonthNavigator />
 
         <View style={styles.titleSection}>
           <View style={styles.targetBadge}>

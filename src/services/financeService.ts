@@ -19,6 +19,7 @@ export type FinanceSummary = {
   savingsUsed: number;
   remainingSavings: number;
   remainingPlanned: number;
+  isCurrentMonth: boolean;
   todayTransport: number;
   transportThisMonth: number;
 };
@@ -30,7 +31,7 @@ export function getBudgetBucket(category: SetupTransaction["category"]): BudgetB
   return category === "transport" ? "fixed" : "extra";
 }
 
-function getMonthKey(value: string | Date) {
+export function getMonthKey(value: string | Date) {
   const date = typeof value === "string" ? new Date(value) : value;
   return `${date.getFullYear()}-${date.getMonth()}`;
 }
@@ -46,6 +47,7 @@ export function calculateFinanceSummary(
   transactions: SetupTransaction[],
   referenceDate = new Date()
 ): FinanceSummary {
+  const isCurrentMonth = getMonthKey(referenceDate) === getMonthKey(new Date());
   const monthTransactions = transactions.filter(
     (transaction) => getMonthKey(transaction.date) === getMonthKey(referenceDate)
   );
@@ -71,10 +73,11 @@ export function calculateFinanceSummary(
   const fixedOverrun = Math.max(fixedSpent - fixedBudget, 0);
   const extraOverrun = Math.max(extraSpent - extraBudget, 0);
   const savingsUsed = unplannedSpent + fixedOverrun + extraOverrun;
+  const transportDay = isCurrentMonth ? new Date() : referenceDate;
   const todayTransport = monthTransactions
     .filter(
       (transaction) =>
-        transaction.category === "transport" && getDayKey(transaction.date) === getDayKey(referenceDate)
+        transaction.category === "transport" && getDayKey(transaction.date) === getDayKey(transportDay)
     )
     .reduce((sum, transaction) => sum + transaction.amount, 0);
 
@@ -95,6 +98,7 @@ export function calculateFinanceSummary(
     savingsUsed,
     remainingSavings: Math.max(savingsBudget - savingsUsed, 0),
     remainingPlanned: Math.max(fixedBudget - fixedSpent, 0) + Math.max(extraBudget - extraSpent, 0),
+    isCurrentMonth,
     todayTransport,
     transportThisMonth: categoryTotals.transport
   };

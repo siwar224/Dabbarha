@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { MonthNavigator } from "@/components/MonthNavigator";
 import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 
@@ -32,11 +33,7 @@ export default function EditMonthlyScreen() {
           <View style={styles.headerSpacer} />
         </View>
 
-        <View style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-left" color={colors.primary} size={24} />
-          <Text style={styles.monthText}>نوفمبر 2024</Text>
-          <MaterialCommunityIcons name="chevron-right" color={colors.primary} size={24} />
-        </View>
+        <MonthNavigator />
 
         <View style={styles.salaryCard}>
           <Text style={styles.fieldLabel}>الشهرية (د)</Text>

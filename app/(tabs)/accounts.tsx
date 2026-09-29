@@ -4,10 +4,12 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories } from "@/constants/categories";
+import { MonthNavigator } from "@/components/MonthNavigator";
 import { useSetup, type SetupTransaction } from "@/context/SetupContext";
-import { calculateFinanceSummary } from "@/services/financeService";
+import { calculateFinanceSummary, getMonthKey } from "@/services/financeService";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
+import { addMonths, formatMonthName } from "@/utils/month";
 
 const logoHeader = require("../../assets/images/logo-header.png");
 
@@ -28,18 +30,25 @@ type CategoryBreakdownItem = {
   backgroundColor: string;
 };
 
-const monthComparisons = [
-  { month: "أكتوبر", amount: 300, color: "#B9A4FF", progress: 0.6 },
-  { month: "نوفمبر", amount: 500, color: colors.coral, progress: 1 },
-  { month: "ديسمبر", amount: 500, color: "#B9A4FF", progress: 1 }
-] as const;
-
 export default function AccountsScreen() {
-  const { income, allocations, transactions } = useSetup();
-  const summary = calculateFinanceSummary(income, allocations, transactions);
+  const { income, allocations, transactions, selectedMonth } = useSetup();
+  const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth);
   const spent = summary.totalSpent;
   const savings = summary.remainingSavings;
   const latestTransactions = summary.monthTransactions.slice(0, 3);
+  const comparisonMonths = [-1, 0, 1].map((offset) => addMonths(selectedMonth, offset));
+  const comparisonAmounts = comparisonMonths.map((month) =>
+    transactions
+      .filter((transaction) => getMonthKey(transaction.date) === getMonthKey(month))
+      .reduce((sum, transaction) => sum + transaction.amount, 0)
+  );
+  const comparisonMax = Math.max(...comparisonAmounts, 1);
+  const monthComparisons = comparisonMonths.map((month, index) => ({
+    month: formatMonthName(month),
+    amount: comparisonAmounts[index],
+    color: index === 1 ? colors.coral : "#B9A4FF",
+    progress: comparisonAmounts[index] / comparisonMax
+  }));
   const accountMetrics: AccountMetric[] = [
     {
       label: "الدخل",
@@ -92,11 +101,7 @@ export default function AccountsScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={22} />
-          <Text style={styles.monthText}>نوفمبر 2024</Text>
-          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
-        </Pressable>
+        <MonthNavigator />
 
         <View style={styles.metricsRow}>
           {accountMetrics.map((metric) => (

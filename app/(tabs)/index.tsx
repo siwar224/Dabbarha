@@ -1,21 +1,30 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import type { ComponentProps } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories } from "@/constants/categories";
-import { homePreviewData, type HomeMetricPreview } from "@/constants/homePreviewData";
+import { MonthNavigator } from "@/components/MonthNavigator";
 import { useSetup } from "@/context/SetupContext";
 import { calculateFinanceSummary } from "@/services/financeService";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
+import { formatDay } from "@/utils/month";
 
 const logoHeader = require("../../assets/images/logo-header.png");
 const walletHero = require("../../assets/images/wallet-hero-transparent.png");
 
+type HomeMetricPreview = {
+  label: string;
+  amount: number;
+  icon: ComponentProps<typeof MaterialCommunityIcons>["name"];
+  tone: "lavender" | "gold" | "coral";
+};
+
 export default function HomeScreen() {
-  const { income, allocations, goal, transactions } = useSetup();
-  const summary = calculateFinanceSummary(income, allocations, transactions);
+  const { income, allocations, goal, transactions, selectedMonth } = useSetup();
+  const summary = calculateFinanceSummary(income, allocations, transactions, selectedMonth);
   const activeGoal = goal ?? {
     title: "هدفي: تليفون",
     targetAmount: 950,
@@ -60,11 +69,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={22} />
-          <Text style={styles.monthText}>{homePreviewData.month}</Text>
-          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
-        </Pressable>
+        <MonthNavigator />
 
         <Pressable
           onPress={() => router.push("/monthly/edit")}
@@ -117,7 +122,7 @@ export default function HomeScreen() {
 
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionDate}>{homePreviewData.todayLabel}</Text>
+          <Text style={styles.sectionDate}>{summary.isCurrentMonth ? `اليوم، ${formatDay(new Date())}` : "مصروفات الشهر"}</Text>
             <View style={styles.sectionTitleRow}>
               <Text style={styles.sectionTitle}>مصروفات اليوم</Text>
               <MaterialCommunityIcons name="calendar-outline" color={colors.primary} size={22} />
@@ -165,7 +170,7 @@ function BudgetStatusCard({ summary }: { summary: ReturnType<typeof calculateFin
           <MaterialCommunityIcons name="bus" color={colors.primary} size={22} />
         </View>
         <View style={styles.transportText}>
-          <Text style={styles.transportTitle}>ترانسبور اليوم</Text>
+          <Text style={styles.transportTitle}>{summary.isCurrentMonth ? "ترانسبور اليوم" : "ترانسبور الشهر"}</Text>
           <Text style={styles.transportHint}>هذا الشهر: {formatMoney(summary.transportThisMonth)}</Text>
         </View>
         <Text style={styles.transportAmount}>{formatMoney(summary.todayTransport)}</Text>

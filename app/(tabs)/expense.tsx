@@ -5,16 +5,19 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { expenseCategories, type CategoryOption } from "@/constants/categories";
+import { MonthNavigator } from "@/components/MonthNavigator";
 import { useSetup } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import type { ExpenseCategory } from "@/types/finance";
+import { formatDay, isSameMonth } from "@/utils/month";
 
 export default function ExpenseScreen() {
-  const { addTransaction } = useSetup();
+  const { addTransaction, selectedMonth } = useSetup();
   const [amount, setAmount] = useState("25");
   const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory>("transport");
   const [isUnplanned, setIsUnplanned] = useState(false);
   const [note, setNote] = useState("");
+  const expenseDate = isSameMonth(selectedMonth, new Date()) ? new Date() : selectedMonth;
 
   async function handleSubmit() {
     const parsedAmount = Number(amount);
@@ -25,7 +28,7 @@ export default function ExpenseScreen() {
     await addTransaction({
       amount: parsedAmount,
       category: selectedCategory,
-      date: new Date().toISOString(),
+      date: expenseDate.toISOString(),
       note: note.trim() || undefined,
       isUnplanned
     });
@@ -45,6 +48,8 @@ export default function ExpenseScreen() {
           <Text style={styles.screenTitle}>زيد مصروف</Text>
           <View style={styles.headerSpacer} />
         </View>
+
+        <MonthNavigator />
 
         <View style={styles.amountSection}>
           <Text style={styles.fieldLabel}>المبلغ (د)</Text>
@@ -74,7 +79,7 @@ export default function ExpenseScreen() {
 
         <Pressable style={styles.dateRow}>
           <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={23} />
-          <Text style={styles.dateValue}>15 نوفمبر 2024</Text>
+          <Text style={styles.dateValue}>{formatDay(expenseDate)}</Text>
           <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={24} />
         </Pressable>
 

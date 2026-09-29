@@ -4,9 +4,11 @@ import { router } from "expo-router";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { MonthNavigator } from "@/components/MonthNavigator";
 import { useSetup, type SetupAllocation } from "@/context/SetupContext";
 import { colors } from "@/theme/colors";
 import { formatMoney } from "@/utils/formatMoney";
+import { addMonths, formatMonthName } from "@/utils/month";
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>["name"];
 
@@ -14,14 +16,13 @@ const logoHeader = require("../../assets/images/logo-header.png");
 const planWallet = require("../../assets/images/wallet-plan.png");
 const phoneGoal = require("../../assets/images/phone-goal.png");
 
-const upcomingMonths = [
-  { month: "أكتوبر", amount: 300, color: colors.coral, background: colors.softCoral, progress: 0.44 },
-  { month: "نوفمبر", amount: 500, color: "#756BD8", background: colors.lavender, progress: 0.56 },
-  { month: "ديسمبر", amount: 500, color: "#76B8FF", background: colors.softBlue, progress: 0.98 }
-] as const;
-
 export default function PlanScreen() {
-  const { income, allocations, goal } = useSetup();
+  const { income, allocations, goal, selectedMonth } = useSetup();
+  const upcomingMonths = [
+    { month: formatMonthName(addMonths(selectedMonth, 0)), amount: 300, color: colors.coral, background: colors.softCoral, progress: 0.44 },
+    { month: formatMonthName(addMonths(selectedMonth, 1)), amount: 500, color: "#756BD8", background: colors.lavender, progress: 0.56 },
+    { month: formatMonthName(addMonths(selectedMonth, 2)), amount: 500, color: "#76B8FF", background: colors.softBlue, progress: 0.98 }
+  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -38,11 +39,7 @@ export default function PlanScreen() {
           </Pressable>
         </View>
 
-        <Pressable style={styles.monthPill}>
-          <MaterialCommunityIcons name="chevron-down" color={colors.primary} size={22} />
-          <Text style={styles.monthText}>نوفمبر 2024</Text>
-          <MaterialCommunityIcons name="calendar-month-outline" color={colors.primary} size={21} />
-        </Pressable>
+        <MonthNavigator />
 
         <View style={styles.titleWrap}>
           <MaterialCommunityIcons name="star-four-points" color={colors.coral} size={18} />

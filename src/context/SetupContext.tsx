@@ -11,11 +11,15 @@ import {
   saveUpdatedGoal
 } from "@/db";
 import type { SetupAllocation, SetupData, SetupGoal, SetupGoalInput, SetupTransaction } from "@/types/setup";
+import { addMonths, startOfMonth } from "@/utils/month";
 
 export type { SetupAllocation, SetupGoal, SetupGoalInput, SetupTransaction } from "@/types/setup";
 
 type SetupContextValue = SetupData & {
   isLoaded: boolean;
+  selectedMonth: Date;
+  setSelectedMonth: (month: Date) => void;
+  moveSelectedMonth: (amount: number) => void;
   setIncome: (income: number) => Promise<void>;
   setAllocations: (allocations: SetupAllocation[]) => Promise<void>;
   setGoal: (goal: SetupGoalInput) => Promise<void>;
@@ -60,6 +64,7 @@ const SetupContext = createContext<SetupContextValue | undefined>(undefined);
 export function SetupProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<SetupData>(defaultSetupData);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(() => startOfMonth(new Date()));
 
   useEffect(() => {
     async function hydrateSetupData() {
@@ -81,6 +86,9 @@ export function SetupProvider({ children }: { children: ReactNode }) {
     () => ({
       ...data,
       isLoaded,
+      selectedMonth,
+      setSelectedMonth: (month: Date) => setSelectedMonth(startOfMonth(month)),
+      moveSelectedMonth: (amount: number) => setSelectedMonth((currentMonth) => addMonths(currentMonth, amount)),
       setIncome: async (income: number) => {
         const nextData = { ...data, income };
         updateData(nextData);
@@ -157,7 +165,7 @@ export function SetupProvider({ children }: { children: ReactNode }) {
         await saveTransaction(savedTransaction);
       }
     }),
-    [data, isLoaded, updateData]
+    [data, isLoaded, selectedMonth, updateData]
   );
 
   return <SetupContext.Provider value={value}>{children}</SetupContext.Provider>;
